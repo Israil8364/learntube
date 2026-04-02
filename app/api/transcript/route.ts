@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { YoutubeTranscript } from 'youtube-transcript-plus';
 import { fetch as undiciFetch, ProxyAgent } from 'undici';
+import fs from 'fs';
+import path from 'path';
 
 // Proxy cache
 let proxyCache: string[] = [];
@@ -8,29 +10,48 @@ let proxyTokenLastFetched = 0;
 
 async function getProxies() {
   const apiKey = process.env.WEBSHARE_API_KEY;
-  if (!apiKey) return [];
+  let allProxies: string[] = [];
 
-  // Cache for 5 minutes
-  if (proxyCache.length > 0 && Date.now() - proxyTokenLastFetched < 5 * 60 * 1000) {
-    return proxyCache;
-  }
-
+  // 1. Try local file "Webshare 10 proxies.txt" if it exists as a static fallback
   try {
-    const res = await fetch('https://proxy.webshare.io/api/v2/proxy/list/?mode=direct&page=1&page_size=25', {
-      headers: { Authorization: `Token ${apiKey}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      proxyCache = data.results.map(
-        (p: any) => `http://${p.username}:${p.password}@${p.proxy_address}:${p.port}`
-      );
-      proxyTokenLastFetched = Date.now();
-      return proxyCache;
+    const localFilePath = path.join(process.cwd(), 'Webshare 10 proxies.txt');
+    if (fs.existsSync(localFilePath)) {
+      const content = fs.readFileSync(localFilePath, 'utf-8');
+      const lines = content.split('\n').filter(l => l.trim().includes(':'));
+      const localProxies = lines.map(line => {
+        const [ip, port, user, pass] = line.trim().split(':');
+        return `http://${user}:${pass}@${ip}:${port}`;
+      });
+      allProxies = [...allProxies, ...localProxies];
     }
   } catch (err) {
-    console.error('Error fetching proxies:', err);
+    console.error('Error reading local proxies:', err);
   }
-  return [];
+
+  // 2. Fetch from API (Cached)
+  if (apiKey) {
+    if (proxyCache.length === 0 || Date.now() - proxyTokenLastFetched > 5 * 60 * 1000) {
+      try {
+        const res = await fetch('https://proxy.webshare.io/api/v2/proxy/list/?mode=direct&page=1&page_size=25', {
+          headers: { Authorization: `Token ${apiKey}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const apiProxies = data.results.map(
+            (p: any) => `http://${p.username}:${p.password}@${p.proxy_address}:${p.port}`
+          );
+          proxyCache = apiProxies;
+          proxyTokenLastFetched = Date.now();
+        }
+      } catch (err) {
+        console.error('Error fetching proxies from API:', err);
+      }
+    }
+    allProxies = [...allProxies, ...proxyCache];
+  }
+
+  // deduplicate
+  return [...new Set(allProxies)];
 }
 
 const decodeEntities = (str: string) => {
@@ -71,9 +92,8 @@ export async function GET(req: NextRequest) {
   const proxies = await getProxies();
   const shuffledProxies = [...proxies].sort(() => 0.5 - Math.random());
 
-  // Strategy: try DIRECT first, but if it consistently fails with 429, we might want to skip it.
-  // We'll try up to 5 different exit IPs (1 direct + 4 proxies)
-  const attempts: (string | null)[] = [null, ...shuffledProxies.slice(0, 5)];
+  // Try ALL available proxies if needed
+  const attempts: (string | null)[] = [null, ...shuffledProxies];
   let lastError: any = null;
   let success = false;
   let finalResult: any = null;
@@ -152,8 +172,15 @@ export async function GET(req: NextRequest) {
       console.error(`[transcript] ${strategyLabel} failed:`, error.message || error);
       lastError = error;
       
+      // If we get a valid error like "No transcripts are available", we can stop early
+      // as it means the IP is NOT flagged, but the video is problematic.
+      if (error?.message?.includes('No transcripts are available')) {
+        console.warn(`[transcript] Video ${videoId} confirmed to have no transcripts via ${strategyLabel}. Stopping...`);
+        lastError = new Error(`The video ${videoId} does not have any captions or transcripts available. Try a different video or paste a transcript manually.`);
+        break;
+      }
+
       // If we got a 429 "Too Many Requests", we should definitely continue to the next attempt
-      // If we got a timeout or connection error, we move on as well.
       if (error?.message?.includes('429') || error?.message?.includes('Too many requests')) {
         console.warn(`[transcript] Strategy ${strategyLabel} rate limited. Moving to next...`);
       }
