@@ -59,18 +59,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
   }
 
-  // Strategy: try DIRECT first (no proxy), then fall back to proxies.
-  // Most home/server IPs work fine with YouTube. Free proxies are often flagged.
+  // Common User Agents for rotation
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1'
+  ];
+
   const proxies = await getProxies();
   const shuffledProxies = [...proxies].sort(() => 0.5 - Math.random());
 
-  // Build attempt list: null = direct, strings = proxy URLs
-  const attempts: (string | null)[] = [null, ...shuffledProxies.slice(0, 3)];
-  let lastError: unknown = null;
+  // Strategy: try DIRECT first, but if it consistently fails with 429, we might want to skip it.
+  // We'll try up to 5 different exit IPs (1 direct + 4 proxies)
+  const attempts: (string | null)[] = [null, ...shuffledProxies.slice(0, 5)];
+  let lastError: any = null;
+  let success = false;
+  let finalResult: any = null;
+  let proxyUsed = false;
 
   for (let i = 0; i < attempts.length; i++) {
     const proxyUrl = attempts[i];
     const strategyLabel = proxyUrl ? `proxy attempt ${i}` : 'direct (no proxy)';
+    const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
     const customFetch = async (params: {
       url: string;
@@ -80,9 +92,11 @@ export async function GET(req: NextRequest) {
     }): Promise<any> => {
       const headers = {
         ...params.headers,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'User-Agent': userAgent,
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       };
 
       if (proxyUrl) {
@@ -99,6 +113,8 @@ export async function GET(req: NextRequest) {
           method: params.method,
           headers,
           body: params.body,
+          // @ts-ignore
+          next: { revalidate: 0 }
         });
       }
     };
@@ -120,23 +136,42 @@ export async function GET(req: NextRequest) {
       }
 
       console.log(`[transcript] Success via ${strategyLabel}`);
-      return NextResponse.json({
+      success = true;
+      proxyUsed = !!proxyUrl;
+      finalResult = {
         videoId,
         title: result.videoDetails.title,
         transcript: fullTranscript,
         segments: result.segments.map((s) => ({ ...s, text: decodeEntities(s.text) })),
         thumbnailUrl,
         url: `https://youtube.com/watch?v=${videoId}`,
-        proxyUsed: !!proxyUrl,
-      });
-    } catch (error) {
-      console.error(`[transcript] ${strategyLabel} failed:`, error);
+        proxyUsed: proxyUsed,
+      };
+      break;
+    } catch (error: any) {
+      console.error(`[transcript] ${strategyLabel} failed:`, error.message || error);
       lastError = error;
+      
+      // If we got a 429 "Too Many Requests", we should definitely continue to the next attempt
+      // If we got a timeout or connection error, we move on as well.
+      if (error?.message?.includes('429') || error?.message?.includes('Too many requests')) {
+        console.warn(`[transcript] Strategy ${strategyLabel} rate limited. Moving to next...`);
+      }
     }
   }
 
+  if (success && finalResult) {
+    return NextResponse.json(finalResult);
+  }
+
+  // If we reach here, all attempts failed.
+  const isRateLimited = lastError?.message?.includes('429') || lastError?.message?.includes('Too many requests');
+  const errorMessage = isRateLimited 
+    ? "YouTube is temporarily rate-limiting requests. We've tried multiple routing paths but still couldn't bypass it. Please try again in a few minutes or with a different video transcript."
+    : (lastError instanceof Error ? lastError.message : 'Failed to fetch transcript after all attempts');
+
   return NextResponse.json(
-    { error: lastError instanceof Error ? lastError.message : 'Failed to fetch transcript after all attempts' },
-    { status: 500 }
+    { error: errorMessage },
+    { status: isRateLimited ? 429 : 500 }
   );
 }
