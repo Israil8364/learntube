@@ -141,18 +141,58 @@ export async function GET(req: NextRequest) {
 
     try {
       console.log(`[transcript] Trying ${strategyLabel} for video ${videoId}`);
-      const result = await YoutubeTranscript.fetchTranscript(videoId, {
-        videoDetails: true,
-        videoFetch: customFetch,
-        transcriptFetch: customFetch,
-        playerFetch: customFetch,
-      });
+      
+      // Attempt 1: Fetch with default settings
+      let transcriptData;
+      try {
+        transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
+          videoDetails: true,
+          videoFetch: customFetch,
+          transcriptFetch: customFetch,
+          playerFetch: customFetch,
+        });
+      } catch (innerError: any) {
+        // Attempt 2: If default fails, check for list of available languages
+        // and try the first available language track. This helps with auto-generated captions.
+        if (innerError?.message?.includes('No transcripts are available')) {
+          console.log(`[transcript] Default fetch failed for ${videoId} via ${strategyLabel}. Checking all languages...`);
+          try {
+            const languages = await YoutubeTranscript.listLanguages(videoId, {
+              videoFetch: customFetch,
+              transcriptFetch: customFetch,
+              playerFetch: customFetch,
+            });
 
-      const fullTranscript = result.segments.map((s) => decodeEntities(s.text)).join(' ');
+            if (languages && languages.length > 0) {
+              const bestTrack = languages[0]; // Take the first available track
+              console.log(`[transcript] Found language track: ${bestTrack.languageCode} (${bestTrack.language}). Retrying...`);
+              transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
+                lang: bestTrack.languageCode,
+                videoDetails: true,
+                videoFetch: customFetch,
+                transcriptFetch: customFetch,
+                playerFetch: customFetch,
+              });
+            } else {
+              throw innerError; // Re-throw if no languages found
+            }
+          } catch (listError) {
+            throw innerError; // Re-throw the original error if listing fails
+          }
+        } else {
+          throw innerError; // Re-throw if it wasn't a "no transcripts" error
+        }
+      }
+
+      if (!transcriptData) {
+        throw new Error('Failed to retrieve transcript data');
+      }
+
+      const fullTranscript = transcriptData.segments.map((s) => decodeEntities(s.text)).join(' ');
 
       let thumbnailUrl = '';
-      if (result.videoDetails.thumbnails.length > 0) {
-        thumbnailUrl = result.videoDetails.thumbnails[result.videoDetails.thumbnails.length - 1].url;
+      if (transcriptData.videoDetails.thumbnails && transcriptData.videoDetails.thumbnails.length > 0) {
+        thumbnailUrl = transcriptData.videoDetails.thumbnails[transcriptData.videoDetails.thumbnails.length - 1].url;
       }
 
       console.log(`[transcript] Success via ${strategyLabel}`);
@@ -160,9 +200,9 @@ export async function GET(req: NextRequest) {
       proxyUsed = !!proxyUrl;
       finalResult = {
         videoId,
-        title: result.videoDetails.title,
+        title: transcriptData.videoDetails.title,
         transcript: fullTranscript,
-        segments: result.segments.map((s) => ({ ...s, text: decodeEntities(s.text) })),
+        segments: transcriptData.segments.map((s) => ({ ...s, text: decodeEntities(s.text) })),
         thumbnailUrl,
         url: `https://youtube.com/watch?v=${videoId}`,
         proxyUsed: proxyUsed,
@@ -172,8 +212,7 @@ export async function GET(req: NextRequest) {
       console.error(`[transcript] ${strategyLabel} failed:`, error.message || error);
       lastError = error;
       
-      // If we get a valid error like "No transcripts are available", we can stop early
-      // as it means the IP is NOT flagged, but the video is problematic.
+      // If we confirm there are REALLY no transcripts after checking all options
       if (error?.message?.includes('No transcripts are available')) {
         console.warn(`[transcript] Video ${videoId} confirmed to have no transcripts via ${strategyLabel}. Stopping...`);
         lastError = new Error(`The video ${videoId} does not have any captions or transcripts available. Try a different video or paste a transcript manually.`);

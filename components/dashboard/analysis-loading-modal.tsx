@@ -1,6 +1,6 @@
 'use client';
 
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from '@/components/ui/dialog';
 import { Check, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,16 +19,16 @@ interface AnalysisLoadingModalProps {
 export function AnalysisLoadingModal({ isOpen, currentStepIndex }: AnalysisLoadingModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md bg-[#0a0f16]/95 border-white/5 backdrop-blur-2xl p-8 rounded-[32px] shadow-2xl outline-none select-none">
+      <DialogContent className="sm:max-w-md bg-[#0a0f16]/95 border-white/5 backdrop-blur-2xl p-8 rounded-[32px] shadow-2xl outline-none select-none [&>button]:hidden">
         <div className="space-y-8 py-4">
-          <div className="space-y-2">
+          <DialogHeader className="space-y-2">
             <DialogTitle className="text-2xl font-bold text-white tracking-tight">
               We are fetching the Transcript
             </DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm font-medium">
               Sit back, this usually takes a few seconds.
             </DialogDescription>
-          </div>
+          </DialogHeader>
 
           <div className="space-y-5">
             {STEPS.map((step, index) => {
