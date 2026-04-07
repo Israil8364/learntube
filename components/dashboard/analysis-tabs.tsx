@@ -21,11 +21,11 @@ interface TranscriptParagraph {
   text: string;
 }
 
-/** Group individual caption segments into readable ~45-second paragraphs */
+/** Group caption segments into ~15-second readable chunks (matches reference image layout) */
 function groupSegmentsIntoParagraphs(segments: NonNullable<Video['segments']>): TranscriptParagraph[] {
   if (!segments || segments.length === 0) return [];
 
-  const PARAGRAPH_DURATION = 45; // seconds per paragraph block
+  const CHUNK_DURATION = 15; // seconds per chunk — matches the image style
   const paragraphs: TranscriptParagraph[] = [];
   let groupStart = segments[0].offset;
   let groupTexts: string[] = [];
@@ -34,7 +34,7 @@ function groupSegmentsIntoParagraphs(segments: NonNullable<Video['segments']>): 
     const elapsed = seg.offset - groupStart;
     const isLast = i === segments.length - 1;
 
-    if (elapsed >= PARAGRAPH_DURATION && groupTexts.length > 0) {
+    if (elapsed >= CHUNK_DURATION && groupTexts.length > 0) {
       paragraphs.push({ startOffset: groupStart, text: groupTexts.join(' ') });
       groupStart = seg.offset;
       groupTexts = [seg.text];
@@ -50,12 +50,15 @@ function groupSegmentsIntoParagraphs(segments: NonNullable<Video['segments']>): 
   return paragraphs;
 }
 
-function formatTimestamp(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
+// Always MM:SS format with leading zeros  e.g. 00:00, 00:16, 01:04
+function formatTimestamp(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function highlightText(text: string, query: string): React.ReactNode {
@@ -283,49 +286,93 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
 
       <TabsContent value="transcript" className="space-y-4">
         <Card className="p-6">
-          {/* Header row */}
+
+          {/* ── Header ─────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div>
               <h3 className="font-semibold text-lg">Full Transcript</h3>
               {wordCount > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {wordCount.toLocaleString()} words · ~{readingMinutes} min read · {paragraphs.length} sections
+                  {wordCount.toLocaleString()} words · ~{readingMinutes} min read
                 </p>
               )}
             </div>
             {video.transcript && (
-              <Button variant="outline" size="sm" onClick={() => copyToClipboard(video.transcript || '', 'Transcript')} className="flex items-center gap-2 transition-all duration-200 self-start sm:self-auto">
-                {copiedType === 'Transcript' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(video.transcript || '', 'Transcript')}
+                className="flex items-center gap-2 self-start sm:self-auto"
+              >
+                {copiedType === 'Transcript'
+                  ? <><Check className="w-4 h-4 text-green-500" /> Copied</>
+                  : <><Copy className="w-4 h-4" /> Copy all</>}
               </Button>
             )}
           </div>
-          {video.segments && video.segments.length > 0 ? (
-            <div className="space-y-4">
-              {video.segments.map((segment, index) => {
-                const minutes = Math.floor(segment.offset / 60);
-                const seconds = Math.floor(segment.offset % 60);
-                const timestamp = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                return (
-                  <div key={index} className="flex gap-4 group">
-                    <span className="text-xs font-mono text-muted-foreground pt-1 w-10 flex-shrink-0">
-                      {timestamp}
-                    </span>
-                    <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors">
-                      {segment.text}
-                    </p>
-                  </div>
-                );
-              })}
+
+          {/* ── Search bar ─────────────────────────────────────── */}
+          {paragraphs.length > 0 && (
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search transcript..."
+                value={transcriptSearch}
+                onChange={(e) => setTranscriptSearch(e.target.value)}
+                className="pl-9 pr-9 bg-muted/40 border-border/50 focus-visible:ring-primary/20 h-9"
+              />
+              {transcriptSearch && (
+                <button
+                  onClick={() => setTranscriptSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              {transcriptSearch && (
+                <p className="text-xs text-muted-foreground mt-1 ml-1">
+                  {filteredParagraphs.length === 0 ? 'No results' : `${filteredParagraphs.length} result${filteredParagraphs.length !== 1 ? 's' : ''}`}
+                </p>
+              )}
             </div>
-          ) : video.transcript ? (
-            <p className="text-base leading-relaxed whitespace-pre-wrap">{video.transcript}</p>
-          ) : (
-            <p className="text-muted-foreground">No transcript available</p>
           )}
+
+          {/* ── Two-column transcript list (matches reference image) ── */}
+          {filteredParagraphs.length > 0 ? (
+            <div className="space-y-0">
+              {filteredParagraphs.map((para, index) => (
+                <div key={index} className="flex gap-6 group/row py-4 border-b border-border/20 last:border-0">
+
+                  {/* Left: timestamp — always MM:SS, clickable */}
+                  <a
+                    href={youtubeUrl(para.startOffset)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 w-12 pt-0.5 font-mono text-sm font-semibold text-primary/70 hover:text-primary transition-colors leading-relaxed"
+                    title="Jump to this point in YouTube"
+                  >
+                    {formatTimestamp(para.startOffset)}
+                  </a>
+
+                  {/* Right: flowing text */}
+                  <p className="text-[15px] leading-[1.8] text-foreground/80 group-hover/row:text-foreground transition-colors flex-1">
+                    {highlightText(para.text, transcriptSearch)}
+                  </p>
+
+                </div>
+              ))}
+            </div>
+          ) : paragraphs.length === 0 && video.transcript ? (
+            <p className="text-[15px] leading-[1.8] whitespace-pre-wrap text-foreground/80">
+              {video.transcript}
+            </p>
+          ) : (
+            <div className="py-12 text-center text-muted-foreground">
+              <Clock className="w-8 h-8 mx-auto mb-3 opacity-20" />
+              <p>No transcript available</p>
+            </div>
+          )}
+
         </Card>
       </TabsContent>
     </Tabs>
