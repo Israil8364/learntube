@@ -147,48 +147,63 @@ export async function GET(req: NextRequest) {
   console.log('[transcript] Raw API response structure:', JSON.stringify(data).slice(0, 300));
 
   // ── 6. Extract transcript segments ────────────────────────────────────────
-  // youtube-transcript.io returns an array of video objects.
-  // Each video has a `transcripts` array with language tracks.
-  // Each track has a `segments`/`transcript` array with { text, start, dur }.
+  // youtube-transcript.io can return data in multiple shapes:
+  //   Shape A — flat segments array:  [{text, start, dur}, ...]
+  //   Shape B — video wrapper array:  [{id, transcripts: [{segments:[...]}]}]
+  //   Shape C — keyed by videoId:     { "VIDEO_ID": [{text,...}] }
 
-  const videoObj = Array.isArray(data) ? data[0] : data?.[videoId] ?? data;
-
-  if (!videoObj) {
-    return NextResponse.json(
-      {
-        error:
-          'No transcript data returned. The video may not have captions available.',
-      },
-      { status: 404 }
-    );
-  }
-
-  // The API may return the tracks under `transcripts` or directly as segments
   let rawSegments: any[] = [];
 
-  if (Array.isArray(videoObj.transcripts) && videoObj.transcripts.length > 0) {
-    // Prefer English, then any available track
-    const sorted = [...videoObj.transcripts].sort((a: any, b: any) => {
-      const aCode = (a.language_code || a.languageCode || '').toLowerCase();
-      const bCode = (b.language_code || b.languageCode || '').toLowerCase();
-      if (aCode.startsWith('en') && !bCode.startsWith('en')) return -1;
-      if (!aCode.startsWith('en') && bCode.startsWith('en')) return 1;
-      return 0;
-    });
+  const isSegment = (item: any): boolean =>
+    item && typeof item === 'object' && typeof item.text === 'string';
 
-    const bestTrack = sorted[0];
-    rawSegments =
-      bestTrack?.segments ??
-      bestTrack?.transcript ??
-      bestTrack?.captions ??
-      [];
-  } else if (Array.isArray(videoObj.segments)) {
-    rawSegments = videoObj.segments;
-  } else if (Array.isArray(videoObj.transcript)) {
-    rawSegments = videoObj.transcript;
-  } else if (Array.isArray(videoObj.captions)) {
-    rawSegments = videoObj.captions;
+  if (Array.isArray(data) && data.length > 0) {
+    if (isSegment(data[0])) {
+      // ── Shape A: top-level array of segment objects ──────────────────────
+      console.log('[transcript] Detected Shape A: flat segments array');
+      rawSegments = data;
+    } else {
+      // ── Shape B: array of video wrapper objects ──────────────────────────
+      console.log('[transcript] Detected Shape B: video wrapper array');
+      const videoObj = data[0];
+
+      if (Array.isArray(videoObj.transcripts) && videoObj.transcripts.length > 0) {
+        // Prefer English; fall back to first available track
+        const sorted = [...videoObj.transcripts].sort((a: any, b: any) => {
+          const aCode = (a.language_code || a.languageCode || '').toLowerCase();
+          const bCode = (b.language_code || b.languageCode || '').toLowerCase();
+          if (aCode.startsWith('en') && !bCode.startsWith('en')) return -1;
+          if (!aCode.startsWith('en') && bCode.startsWith('en')) return 1;
+          return 0;
+        });
+        const bestTrack = sorted[0];
+        rawSegments =
+          bestTrack?.segments ??
+          bestTrack?.transcript ??
+          bestTrack?.captions ??
+          [];
+        // Track itself might be directly {text,start,dur} segments
+        if (rawSegments.length === 0 && isSegment(bestTrack)) {
+          rawSegments = videoObj.transcripts;
+        }
+      } else if (Array.isArray(videoObj.segments)) {
+        rawSegments = videoObj.segments;
+      } else if (Array.isArray(videoObj.transcript)) {
+        rawSegments = videoObj.transcript;
+      } else if (Array.isArray(videoObj.captions)) {
+        rawSegments = videoObj.captions;
+      }
+    }
+  } else if (data && typeof data === 'object') {
+    // ── Shape C: object keyed by videoId ──────────────────────────────────
+    console.log('[transcript] Detected Shape C: keyed object');
+    const inner = data[videoId] ?? Object.values(data)[0];
+    if (Array.isArray(inner)) {
+      rawSegments = isSegment(inner[0]) ? inner : inner[0]?.segments ?? [];
+    }
   }
+
+  console.log(`[transcript] Extracted ${rawSegments.length} raw segments`);
 
   if (!rawSegments || rawSegments.length === 0) {
     return NextResponse.json(
