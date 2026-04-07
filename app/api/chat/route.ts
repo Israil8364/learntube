@@ -58,11 +58,14 @@ export async function POST(req: Request) {
     }
 
     // Limit context length for speed (approx 30k chars is plenty for most videos)
-    if (transcriptContext.length > 30000) {
-      transcriptContext = transcriptContext.substring(0, 30000) + '... [Transcript truncated for speed]';
-    }
+    console.log('Chat API: Transcript context length:', transcriptContext.length);
 
-    const systemPrompt = `You are a helpful Video Learning Assistant. Use the transcript context below to answer questions about the video${videoTitle ? ` titled "${videoTitle}"` : ''}.\n\nTRANSCRIPT:\n${transcriptContext}`;
+    const systemPrompt = `You are a professional Video Learning Assistant. Use the provided transcript context to answer questions about the video${videoTitle ? ` titled "${videoTitle}"` : ''}.
+    
+CRITICAL: You must answer based ONLY on the provided transcript. If the information is not in the transcript, state that you don't have that information. Keep answers clear and helpful.
+
+TRANSCRIPT:
+${transcriptContext}`;
 
     console.log('Chat API: Initiating direct fetch to OpenRouter');
 
