@@ -3,9 +3,8 @@
 import { Video } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
-import { FileText, Lightbulb, Copy, Check, CheckSquare, GraduationCap, Clock, Search, X, ExternalLink } from 'lucide-react';
+import { FileText, Lightbulb, Copy, Check, CheckSquare, GraduationCap, Clock, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 
@@ -61,27 +60,14 @@ function formatTimestamp(totalSeconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function highlightText(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  const parts = text.split(regex);
-  return parts.map((part, i) =>
-    regex.test(part) ? (
-      <mark key={i} className="bg-yellow-300/40 text-foreground rounded px-0.5">
-        {part}
-      </mark>
-    ) : (
-      part
-    )
-  );
-}
+
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
-  const [transcriptSearch, setTranscriptSearch] = useState('');
+
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -107,12 +93,6 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
     [video.segments]
   );
 
-  // Filter paragraphs by search query
-  const filteredParagraphs = useMemo(() => {
-    if (!transcriptSearch.trim()) return paragraphs;
-    const q = transcriptSearch.toLowerCase();
-    return paragraphs.filter((p) => p.text.toLowerCase().includes(q));
-  }, [paragraphs, transcriptSearch]);
 
   // Word count + reading time
   const wordCount = useMemo(() => {
@@ -311,36 +291,12 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
             )}
           </div>
 
-          {/* ── Search bar ─────────────────────────────────────── */}
-          {paragraphs.length > 0 && (
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder="Search transcript..."
-                value={transcriptSearch}
-                onChange={(e) => setTranscriptSearch(e.target.value)}
-                className="pl-9 pr-9 bg-muted/40 border-border/50 focus-visible:ring-primary/20 h-9"
-              />
-              {transcriptSearch && (
-                <button
-                  onClick={() => setTranscriptSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-              {transcriptSearch && (
-                <p className="text-xs text-muted-foreground mt-1 ml-1">
-                  {filteredParagraphs.length === 0 ? 'No results' : `${filteredParagraphs.length} result${filteredParagraphs.length !== 1 ? 's' : ''}`}
-                </p>
-              )}
-            </div>
-          )}
 
-          {/* ── Two-column transcript list (matches reference image) ── */}
-          {filteredParagraphs.length > 0 ? (
+
+          {/* ── Two-column transcript list ── */}
+          {paragraphs.length > 0 ? (
             <div className="space-y-0">
-              {filteredParagraphs.map((para, index) => (
+              {paragraphs.map((para, index) => (
                 <div key={index} className="flex gap-6 group/row py-4 border-b border-border/20 last:border-0">
 
                   {/* Left: timestamp — always MM:SS, clickable */}
@@ -356,7 +312,7 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
 
                   {/* Right: flowing text */}
                   <p className="text-[15px] leading-[1.8] text-foreground/80 group-hover/row:text-foreground transition-colors flex-1">
-                    {highlightText(para.text, transcriptSearch)}
+                    {para.text}
                   </p>
 
                 </div>
