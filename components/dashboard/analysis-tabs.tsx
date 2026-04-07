@@ -3,41 +3,126 @@
 import { Video } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
-import { FileText, Lightbulb, Tag, Copy, Check, CheckSquare, GraduationCap, Clock } from 'lucide-react';
+import { FileText, Lightbulb, Copy, Check, CheckSquare, GraduationCap, Clock, Search, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface AnalysisTabsProps {
   video: Video;
   onUpdateTasks?: (tasks: string[]) => void;
 }
 
+// ─── Transcript helpers ────────────────────────────────────────────────────
+
+interface TranscriptParagraph {
+  startOffset: number;   // seconds
+  text: string;
+}
+
+/** Group individual caption segments into readable ~45-second paragraphs */
+function groupSegmentsIntoParagraphs(segments: NonNullable<Video['segments']>): TranscriptParagraph[] {
+  if (!segments || segments.length === 0) return [];
+
+  const PARAGRAPH_DURATION = 45; // seconds per paragraph block
+  const paragraphs: TranscriptParagraph[] = [];
+  let groupStart = segments[0].offset;
+  let groupTexts: string[] = [];
+
+  segments.forEach((seg, i) => {
+    const elapsed = seg.offset - groupStart;
+    const isLast = i === segments.length - 1;
+
+    if (elapsed >= PARAGRAPH_DURATION && groupTexts.length > 0) {
+      paragraphs.push({ startOffset: groupStart, text: groupTexts.join(' ') });
+      groupStart = seg.offset;
+      groupTexts = [seg.text];
+    } else {
+      groupTexts.push(seg.text);
+    }
+
+    if (isLast && groupTexts.length > 0) {
+      paragraphs.push({ startOffset: groupStart, text: groupTexts.join(' ') });
+    }
+  });
+
+  return paragraphs;
+}
+
+function formatTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark key={i} className="bg-yellow-300/40 text-foreground rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
+
 export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
+  const [transcriptSearch, setTranscriptSearch] = useState('');
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedType(label);
     toast.success(`${label} copied to clipboard`);
-    
-    setTimeout(() => {
-      setCopiedType(null);
-    }, 2000);
+    setTimeout(() => setCopiedType(null), 2000);
   };
 
   const handleCompleteTask = (task: string) => {
     if (!onUpdateTasks || completingTask) return;
-    
     setCompletingTask(task);
     toast.success('Task marked as complete');
-    
     setTimeout(() => {
       const updatedTasks = (video.tasks || []).filter((t) => t !== task);
       onUpdateTasks(updatedTasks);
       setCompletingTask(null);
-    }, 600); // 0.6s delay for animation
+    }, 600);
+  };
+
+  // Grouped paragraphs (memoized — only recomputed when segments change)
+  const paragraphs = useMemo(
+    () => groupSegmentsIntoParagraphs(video.segments || []),
+    [video.segments]
+  );
+
+  // Filter paragraphs by search query
+  const filteredParagraphs = useMemo(() => {
+    if (!transcriptSearch.trim()) return paragraphs;
+    const q = transcriptSearch.toLowerCase();
+    return paragraphs.filter((p) => p.text.toLowerCase().includes(q));
+  }, [paragraphs, transcriptSearch]);
+
+  // Word count + reading time
+  const wordCount = useMemo(() => {
+    const text = video.transcript || '';
+    return text.split(/\s+/).filter(Boolean).length;
+  }, [video.transcript]);
+
+  const readingMinutes = Math.ceil(wordCount / 200);
+
+  const youtubeUrl = (offset: number) => {
+    const videoIdMatch = video.url?.match(/(?:v=|youtu\.be\/)([^&?#]+)/);
+    const videoId = videoIdMatch?.[1] ?? '';
+    return `https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(offset)}s`;
   };
 
   return (
@@ -73,17 +158,8 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
               <p className="text-base leading-relaxed whitespace-pre-wrap">{video.summary}</p>
             </div>
             {video.summary && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(video.summary || '', 'Summary')}
-                className="transition-all duration-200"
-              >
-                {copiedType === 'Summary' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(video.summary || '', 'Summary')} className="transition-all duration-200">
+                {copiedType === 'Summary' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               </Button>
             )}
           </div>
@@ -95,17 +171,8 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
           <div className="flex items-start justify-between gap-4 mb-4">
             <h3 className="font-semibold text-lg">Key Takeaways</h3>
             {video.keyPoints && video.keyPoints.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(video.keyPoints?.join('\n') || '', 'Takeaways')}
-                className="transition-all duration-200"
-              >
-                {copiedType === 'Takeaways' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(video.keyPoints?.join('\n') || '', 'Takeaways')} className="transition-all duration-200">
+                {copiedType === 'Takeaways' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               </Button>
             )}
           </div>
@@ -127,10 +194,7 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
             {video.topics && video.topics.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {video.topics.map((topic, index) => (
-                  <div
-                    key={index}
-                    className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium"
-                  >
+                  <div key={index} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
                     {topic}
                   </div>
                 ))}
@@ -147,17 +211,8 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
           <div className="flex items-start justify-between gap-4 mb-4">
             <h3 className="font-semibold text-lg">Tasks & Action Items</h3>
             {video.tasks && video.tasks.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(video.tasks?.join('\n') || '', 'Tasks')}
-                className="transition-all duration-200"
-              >
-                {copiedType === 'Tasks' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(video.tasks?.join('\n') || '', 'Tasks')} className="transition-all duration-200">
+                {copiedType === 'Tasks' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               </Button>
             )}
           </div>
@@ -206,17 +261,8 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
           <div className="flex items-start justify-between gap-4 mb-4">
             <h3 className="font-semibold text-lg">Concepts & Learnings</h3>
             {video.learnings && video.learnings.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(video.learnings?.map(l => `${l.term}: ${l.explanation}`).join('\n\n') || '', 'Learnings')}
-                className="transition-all duration-200"
-              >
-                {copiedType === 'Learnings' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(video.learnings?.map(l => `${l.term}: ${l.explanation}`).join('\n\n') || '', 'Learnings')} className="transition-all duration-200">
+                {copiedType === 'Learnings' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               </Button>
             )}
           </div>
@@ -237,15 +283,18 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
 
       <TabsContent value="transcript" className="space-y-4">
         <Card className="p-6">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <h3 className="font-semibold text-lg">Full Transcript</h3>
+          {/* Header row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h3 className="font-semibold text-lg">Full Transcript</h3>
+              {wordCount > 0 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {wordCount.toLocaleString()} words · ~{readingMinutes} min read · {paragraphs.length} sections
+                </p>
+              )}
+            </div>
             {video.transcript && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(video.transcript || '', 'Transcript')}
-                className="transition-all duration-200"
-              >
+              <Button variant="outline" size="sm" onClick={() => copyToClipboard(video.transcript || '', 'Transcript')} className="flex items-center gap-2 transition-all duration-200 self-start sm:self-auto">
                 {copiedType === 'Transcript' ? (
                   <Check className="w-4 h-4 text-green-500" />
                 ) : (
