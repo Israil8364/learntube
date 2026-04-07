@@ -67,7 +67,7 @@ ${transcript}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "qwen/qwen3.6-plus:free",
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
         "messages": [
           {
             "role": "user",

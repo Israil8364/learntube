@@ -71,6 +71,14 @@ export default function AnalysisDashboard() {
     }
   };
 
+  const handleUpdateTasks = (tasks: string[]) => {
+    if (video) {
+      const updatedVideo = { ...video, tasks };
+      saveVideo(updatedVideo);
+      setVideo(updatedVideo);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -212,7 +220,7 @@ export default function AnalysisDashboard() {
 
             {/* Content Tabs Section */}
             <section className="bg-card rounded-2xl border border-border shadow-sm p-2 md:p-4">
-              <AnalysisTabs video={video} />
+              <AnalysisTabs video={video} onUpdateTasks={handleUpdateTasks} />
             </section>
           </div>
         </main>

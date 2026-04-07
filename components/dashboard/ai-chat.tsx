@@ -5,7 +5,7 @@ import { Video, ChatMessage } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Loader2, MessageSquare } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 import ReactMarkdown from 'react-markdown';
@@ -20,6 +20,7 @@ export function AIChat({ video, onUpdateChat }: AIChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(video.aiConversation || []);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Sync back to video object when messages change
@@ -144,6 +145,15 @@ export function AIChat({ video, onUpdateChat }: AIChatProps) {
     handleSendMessage(undefined, prompt);
   };
 
+  const copyMessage = (id: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedId(id);
+    toast.success('Message copied to clipboard');
+    setTimeout(() => {
+      setCopiedId(null);
+    }, 2000);
+  };
+
   return (
     <div className="flex flex-col h-full bg-muted/20 border-border overflow-hidden">
       <div className="p-4 border-b border-border bg-card flex-shrink-0">
@@ -181,12 +191,26 @@ export function AIChat({ video, onUpdateChat }: AIChatProps) {
                 className={`flex flex-col mb-4 ${message.role === 'user' ? 'items-end' : 'items-start'} min-w-0`}
               >
                 <div
-                  className={`max-w-[92%] px-5 py-3 rounded-2xl text-sm leading-relaxed break-words overflow-hidden ${
+                  className={`max-w-[92%] px-5 py-3 rounded-2xl text-sm leading-relaxed break-words overflow-hidden relative group/msg ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground rounded-tr-none shadow-sm'
                       : 'bg-card border border-border/50 text-foreground rounded-tl-none shadow-sm'
                   }`}
                 >
+                  {message.role === 'assistant' && message.content && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-1 right-1 w-7 h-7 opacity-0 group-hover/msg:opacity-100 transition-opacity"
+                      onClick={() => copyMessage(message.id, message.content)}
+                    >
+                      {copiedId === message.id ? (
+                        <Check className="w-3.5 h-3.5 text-green-500" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
+                    </Button>
+                  )}
                   <div className="markdown-content prose-sm max-w-none break-words overflow-wrap-anywhere prose-p:leading-relaxed prose-p:mb-3 prose-li:my-1 prose-headings:mt-4">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {message.content}
