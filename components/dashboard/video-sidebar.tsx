@@ -42,7 +42,7 @@ export function VideoSidebar({ videos, currentVideoId, onDeleteVideo }: VideoSid
           </Button>
         </Link>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0 h-full">
         <div className="space-y-1 p-2">
           {videos.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">

@@ -98,7 +98,7 @@ export default function AnalysisDashboard() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-72 flex-shrink-0 border-r border-border bg-muted/20">
+      <aside className="hidden lg:flex h-full w-72 flex-shrink-0 border-r border-border bg-muted/20 overflow-hidden">
         <VideoSidebar
           videos={videos}
           currentVideoId={videoId}
@@ -118,7 +118,7 @@ export default function AnalysisDashboard() {
                     <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-80">
+                <SheetContent side="left" className="p-0 w-80 h-full overflow-hidden">
                   <VideoSidebar
                     videos={videos}
                     currentVideoId={videoId}
@@ -227,7 +227,7 @@ export default function AnalysisDashboard() {
       </div>
 
       {/* Desktop Persistent Chat */}
-      <aside className="hidden xl:flex w-[400px] flex-shrink-0 border-l border-border bg-card">
+      <aside className="hidden xl:flex h-full w-[400px] flex-shrink-0 border-l border-border bg-card">
         <AIChat video={video} onUpdateChat={handleUpdateChat} />
       </aside>
     </div>
