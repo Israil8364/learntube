@@ -149,35 +149,42 @@ export async function GET(req: NextRequest) {
     try {
       console.log(`[transcript] Trying ${strategyLabel} for video ${videoId}...`);
       
-      // Attempt 1: Fetch with default settings
       let transcriptData;
+      // Configure fetch options based on whether we use a proxy or not
+      const fetchOptions: any = {
+        videoDetails: true,
+      };
+
+      if (proxyUrl) {
+        // For proxy attempts, we MUST use our custom undici-based fetch
+        fetchOptions.videoFetch = customFetch;
+        fetchOptions.transcriptFetch = customFetch;
+        fetchOptions.playerFetch = customFetch;
+      } else {
+        // For DIRECT attempts, use library defaults as they are often more reliable/clean
+        // We do NOT override the fetchers here.
+      }
+
       try {
-        transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
-          videoDetails: true,
-          videoFetch: customFetch,
-          transcriptFetch: customFetch,
-          playerFetch: customFetch,
-        });
+        transcriptData = await YoutubeTranscript.fetchTranscript(videoId, fetchOptions);
       } catch (innerError: any) {
         // Attempt 2: If default fails, check for list of available languages
-        // and try available language tracks in order of preference.
         console.warn(`[transcript] Default fetch failed for ${videoId} via ${strategyLabel}: ${innerError?.message || 'Unknown error'}`);
         
-        // Check for specific "No transcripts available" which could be a false negative for auto-generated captions
-        if (innerError?.message?.includes('No transcripts are available') || 
+        if (innerError?.message?.includes('No transcripts') || 
             innerError?.message?.includes('Transcript is disabled') ||
-            innerError?.message?.includes('404')) {
+            innerError?.message?.includes('404') ||
+            innerError?.message?.includes('removed')) {
           
           console.log(`[transcript] Attempting listLanguages fallback for ${videoId} via ${strategyLabel}...`);
           try {
-            const languages = await YoutubeTranscript.listLanguages(videoId, {
+            const languages = await YoutubeTranscript.listLanguages(videoId, proxyUrl ? {
               videoFetch: customFetch,
               transcriptFetch: customFetch,
               playerFetch: customFetch,
-            });
+            } : {});
 
             if (languages && languages.length > 0) {
-              // Prioritize English, then non-auto-generated, then anything else
               const sortedLanguages = [...languages].sort((a: any, b: any) => {
                 const aCode = (a.languageCode || a.lang || a.code || '').toLowerCase();
                 const bCode = (b.languageCode || b.lang || b.code || '').toLowerCase();
@@ -197,11 +204,8 @@ export async function GET(req: NextRequest) {
                   
                   console.log(`[transcript] Attempting retry with language track: ${langCode} (${langLabel})...`);
                   transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
+                    ...fetchOptions,
                     lang: langCode,
-                    videoDetails: true,
-                    videoFetch: customFetch,
-                    transcriptFetch: customFetch,
-                    playerFetch: customFetch,
                   });
                   
                   if (transcriptData && transcriptData.segments) {
@@ -213,18 +217,15 @@ export async function GET(req: NextRequest) {
                 }
               }
               
-              if (!retrySuccess) {
-                throw innerError; // If all retries failed, throw original error
-              }
+              if (!retrySuccess) throw innerError;
             } else {
-              throw innerError; // Re-throw if no languages found
+              throw innerError;
             }
           } catch (listError: any) {
-            console.error('[transcript] listLanguages failed also:', listError.message || listError);
-            throw innerError; // Re-throw the original error if listing fails
+            throw innerError;
           }
         } else {
-          throw innerError; // Re-throw if it wasn't a "no transcripts" / 404 error
+          throw innerError;
         }
       }
 
