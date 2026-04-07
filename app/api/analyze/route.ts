@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { analyzeTranscript } from '@/lib/gemini';
+import { analyzeTranscript } from '@/lib/ai-service';
 
 const analyzeSchema = z.object({
   transcript: z.string().min(1, 'Transcript is required'),
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { transcript, title, thumbnail, segments } = result.data;
     const videoTitle = title || 'Video';
 
-    // Analyze using Gemini
+    // Analyze using AI Service
     const analysis = await analyzeTranscript(transcript, videoTitle);
 
     return NextResponse.json({
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     console.error('Analyze API error:', error);
 
     if (error instanceof Error) {
-      if (error.message.includes('GEMINI_API_KEY')) {
+      if (error.message.includes('OPENROUTER_API_KEY')) {
         return NextResponse.json(
           { error: 'API configuration error. Please check environment variables.' },
           { status: 500 }

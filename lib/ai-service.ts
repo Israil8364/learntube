@@ -17,7 +17,7 @@ export function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
- * Analyze a transcript using OpenRouter API
+ * Analyze a transcript using AI analysis service (OpenRouter)
  */
 export async function analyzeTranscript(
   transcript: string,
