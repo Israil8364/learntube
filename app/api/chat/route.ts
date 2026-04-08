@@ -79,7 +79,7 @@ ${transcriptContext}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "model": "google/gemini-flash-1.5:free",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
