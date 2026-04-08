@@ -11,7 +11,8 @@ const openrouter = createOpenAI({
   },
 });
 
-export const maxDuration = 30;
+export const runtime = 'edge';
+export const maxDuration = 60;
 
 const chatSchema = z.object({
   messages: z.array(z.object({
