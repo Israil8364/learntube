@@ -119,6 +119,12 @@ export default function AnalysisDashboard() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-80 h-full overflow-hidden">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Navigation Menu</SheetTitle>
+                    <SheetDescription>
+                      Access your listed and analyzed videos.
+                    </SheetDescription>
+                  </SheetHeader>
                   <VideoSidebar
                     videos={videos}
                     currentVideoId={videoId}
@@ -159,6 +165,12 @@ export default function AnalysisDashboard() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="p-0 w-full sm:max-w-md">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>AI Chat Assistant</SheetTitle>
+                    <SheetDescription>
+                      Ask questions about the current video transcript.
+                    </SheetDescription>
+                  </SheetHeader>
                   <AIChat video={video} onUpdateChat={handleUpdateChat} />
                 </SheetContent>
               </Sheet>
