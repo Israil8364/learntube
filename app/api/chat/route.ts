@@ -79,7 +79,7 @@ ${transcriptContext}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
+        "model": "qwen/qwen3-next-80b-a3b-instruct:free",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
