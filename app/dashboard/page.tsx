@@ -13,13 +13,31 @@ import { Input } from '@/components/ui/input';
 export default function DashboardPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedVideos = getStoredVideos();
-    // Sort by newest first
-    setVideos(storedVideos.sort((a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ));
+    async function fetchVideos() {
+      try {
+        const response = await fetch('/api/analyses');
+        if (response.ok) {
+          const data = await response.json();
+          setVideos(data);
+        } else {
+          // Fallback to local storage if API fails or for offline support
+          const storedVideos = getStoredVideos();
+          setVideos(storedVideos.sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          ));
+        }
+      } catch (error) {
+        console.error('Error fetching videos:', error);
+        const storedVideos = getStoredVideos();
+        setVideos(storedVideos);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchVideos();
   }, []);
 
   const filteredVideos = videos.filter(video =>
@@ -27,7 +45,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 pt-10">
       <div className="container max-w-7xl mx-auto px-4 py-12">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">

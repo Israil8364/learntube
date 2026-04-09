@@ -19,8 +19,20 @@ export default function LandingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const storedVideos = getStoredVideos();
-    setVideos(storedVideos);
+    async function fetchVideos() {
+      try {
+        const response = await fetch('/api/analyses');
+        if (response.ok) {
+          const data = await response.json();
+          setVideos(data);
+        } else {
+          setVideos(getStoredVideos());
+        }
+      } catch (error) {
+        setVideos(getStoredVideos());
+      }
+    }
+    fetchVideos();
   }, []);
 
   const handleAnalyze = async (url: string | null, transcript: string | null) => {
@@ -80,11 +92,14 @@ export default function LandingPage() {
 
       if (!response.ok) {
         const errData = await response.json();
+        if (response.status === 429) {
+          throw new Error(errData.error || 'Rate limit exceeded. Please sign up to continue.');
+        }
         throw new Error(errData.error || 'Failed to analyze video');
       }
 
       const data = await response.json();
-      const videoId = generateVideoId();
+      const videoId = data.id || generateVideoId();
 
       const newVideo: Video = {
         id: videoId,
@@ -102,7 +117,6 @@ export default function LandingPage() {
         createdAt: new Date().toISOString(),
       };
 
-      saveVideo(newVideo);
       setVideos([newVideo, ...videos]);
 
       toast.success('Video analyzed successfully!');

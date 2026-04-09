@@ -24,29 +24,52 @@ export default function AnalysisDashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const allVideos = getStoredVideos();
-    setVideos(allVideos);
+    async function loadData() {
+      try {
+        setIsLoading(true);
+        
+        // Load the list for the sidebar
+        const listRes = await fetch('/api/analyses');
+        if (listRes.ok) {
+          const allVideos = await listRes.json();
+          setVideos(allVideos);
+        }
 
-    const currentVideo = getVideo(videoId);
-    if (!currentVideo) {
-      toast.error('Video not found');
-      router.push('/');
-      return;
+        // Load the specific video
+        const videoRes = await fetch(`/api/analyses/${videoId}`);
+        if (videoRes.ok) {
+          const currentVideo = await videoRes.json();
+          setVideo(currentVideo);
+        } else {
+          // Fallback to local
+          const localVideo = getVideo(videoId);
+          if (localVideo) {
+            setVideo(localVideo);
+          } else {
+            toast.error('Video not found');
+            router.push('/');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading analysis:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
-
-    setVideo(currentVideo);
-    setIsLoading(false);
+    
+    loadData();
   }, [videoId, router]);
 
   const handleDeleteVideo = (id: string) => {
     deleteVideo(id);
-    const allVideos = getStoredVideos();
-    setVideos(allVideos);
+    // Note: We should probably also delete from DB if we wanted, 
+    // but for now we'll just remove from the local state list
+    setVideos(prev => prev.filter(v => v.id !== id));
 
     if (id === videoId) {
       router.push('/');
     } else {
-      toast.success('Video deleted');
+      toast.success('Video removed from list');
     }
   };
 
@@ -63,19 +86,44 @@ export default function AnalysisDashboard() {
     toast.success('Transcript downloaded');
   };
 
-  const handleUpdateChat = (messages: any[]) => {
+  const handleUpdateChat = async (messages: any[]) => {
     if (video) {
       const updatedVideo = { ...video, aiConversation: messages };
-      saveVideo(updatedVideo);
       setVideo(updatedVideo);
+      
+      // Persist to DB
+      try {
+        await fetch(`/api/analyses/${videoId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ aiConversation: messages }),
+        });
+      } catch (e) {
+        console.error('Failed to save chat to DB');
+      }
+      
+      // Still save to local as backup
+      saveVideo(updatedVideo);
     }
   };
 
-  const handleUpdateTasks = (tasks: string[]) => {
+  const handleUpdateTasks = async (tasks: string[]) => {
     if (video) {
       const updatedVideo = { ...video, tasks };
-      saveVideo(updatedVideo);
       setVideo(updatedVideo);
+      
+      // Persist to DB
+      try {
+        await fetch(`/api/analyses/${videoId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tasks }),
+        });
+      } catch (e) {
+        console.error('Failed to save tasks to DB');
+      }
+      
+      saveVideo(updatedVideo);
     }
   };
 
