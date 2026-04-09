@@ -172,7 +172,7 @@ export function UserProfileMenu() {
           variant="secondary" 
           className="rounded-full px-6 font-semibold shadow-lg hover:shadow-primary/20 transition-all active:scale-95 bg-primary text-white hover:bg-primary/90 border-none min-w-[100px]"
         >
-          {isSigningIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
+          {isSigningIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In / Sign Up'}
         </Button>
         {renderErrorDialog()}
       </>
