@@ -116,6 +116,10 @@ export function UserProfileMenu() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          queryParams: {
+            prompt: 'consent',
+            access_type: 'offline',
+          },
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
