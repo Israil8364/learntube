@@ -79,7 +79,7 @@ ${transcriptContext}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "nvidia/nemotron-nano-9b-v2:free",
+        "model": "arcee-ai/trinity-mini:free",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
