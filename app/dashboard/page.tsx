@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStoredVideos } from '@/lib/storage';
+import { getStoredVideos, deleteVideo } from '@/lib/storage';
 import { Video } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { PlayCircle, Search, ArrowLeft, LayoutGrid, List } from 'lucide-react';
+import { PlayCircle, Search, ArrowLeft, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -43,6 +45,24 @@ export default function DashboardPage() {
   const filteredVideos = videos.filter(video =>
     video.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this analysis?')) return;
+    
+    // Optimistic UI update
+    setVideos(videos.filter(v => v.id !== id));
+    deleteVideo(id); // Ensure local storage reflects this immediately
+    
+    try {
+      await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
+    } catch (error) {
+       console.error('Failed to delete from server:', error);
+    }
+    
+    router.push('/');
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20 pt-10">
@@ -81,7 +101,19 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredVideos.map((video) => (
               <Link key={video.id} href={`/analysis/${video.id}`} className="block group">
-                <Card className="h-full overflow-hidden bg-white/5 border-white/5 hover:bg-white/[0.08] hover:border-primary/20 transition-all duration-300 transform group-hover:-translate-y-1">
+                <Card className="relative h-full overflow-hidden bg-white/5 border-white/5 hover:bg-white/[0.08] hover:border-primary/20 transition-all duration-300 transform group-hover:-translate-y-1">
+                  
+                  {/* Delete Button */}
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button 
+                      onClick={(e) => handleDelete(e, video.id)} 
+                      className="p-2 bg-black/60 hover:bg-red-500 rounded-full text-white backdrop-blur-md transition-colors"
+                      title="Delete Video"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
                   <div className="relative aspect-video bg-muted/20 overflow-hidden">
                     {video.thumbnail ? (
                       <img

@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono, League_Spartan } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-import { Header } from '@/components/layout/header'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -28,8 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${_geist.className} ${leagueSpartan.variable} antialiased min-h-screen pt-[72px]`} suppressHydrationWarning>
-        <Header />
+      <body className={`${_geist.className} ${leagueSpartan.variable} antialiased min-h-screen`} suppressHydrationWarning>
         {children}
         <Analytics />
       </body>
