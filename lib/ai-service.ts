@@ -67,7 +67,7 @@ ${transcript}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "qwen/qwen3-next-80b-a3b-instruct:free",
+        "model": "google/gemma-3-27b-it:free",
         "messages": [
           {
             "role": "user",
