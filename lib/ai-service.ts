@@ -67,7 +67,7 @@ ${transcript}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemma-2-9b-it:free",
+        "model": "meta-llama/llama-3.1-8b-instruct:free",
         "messages": [
           {
             "role": "user",
