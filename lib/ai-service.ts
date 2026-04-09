@@ -67,7 +67,7 @@ ${transcript}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemma-3-27b-it:free",
+        "model": "nvidia/nemotron-nano-9b-v2:free",
         "messages": [
           {
             "role": "user",
