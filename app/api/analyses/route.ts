@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -16,7 +19,6 @@ export async function GET() {
       query = query.eq('user_id', user.id);
     } else {
       // Try to get device_id from cookies
-      const { cookies } = await import('next/headers');
       const cookieStore = await cookies();
       const deviceId = cookieStore.get('device_id')?.value;
       

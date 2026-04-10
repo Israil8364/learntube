@@ -23,7 +23,7 @@ export function PastAnalyses({ videos }: PastAnalysesProps) {
         <h2 className="text-xl md:text-2xl font-bold tracking-tight">Past Analyses</h2>
         {videos.length > 0 && (
           <Link
-            href={`/analysis/${videos[0].id}`}
+            href="/dashboard"
             className="text-primary hover:text-white bg-primary/10 hover:bg-primary px-5 py-2 md:px-7 md:py-3 rounded-full text-xs md:text-sm font-bold transition-all border border-primary/20 shadow-sm shrink-0"
           >
             View All

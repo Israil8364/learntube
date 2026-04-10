@@ -60,11 +60,21 @@ export default function AnalysisDashboard() {
     loadData();
   }, [videoId, router]);
 
-  const handleDeleteVideo = (id: string) => {
-    deleteVideo(id);
-    // Note: We should probably also delete from DB if we wanted, 
-    // but for now we'll just remove from the local state list
+  const handleDeleteVideo = async (id: string) => {
+    // Optimistic UI update
     setVideos(prev => prev.filter(v => v.id !== id));
+    deleteVideo(id);
+
+    try {
+      const res = await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw new Error('Failed to delete from server');
+      }
+      toast.success('Analysis deleted successfully');
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to fully delete from server, but removed locally');
+    }
 
     if (id === videoId) {
       router.push('/');
