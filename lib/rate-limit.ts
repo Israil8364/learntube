@@ -1,8 +1,8 @@
 import { createClient } from './supabase/server';
 import { cookies } from 'next/headers';
 
-const LIMIT_ANONYMOUS = 2;
-const LIMIT_AUTHENTICATED = 4;
+const LIMIT_ANONYMOUS = 10;
+const LIMIT_AUTHENTICATED = 20;
 
 export async function checkRateLimit() {
   const supabase = await createClient();

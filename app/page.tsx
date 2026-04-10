@@ -56,12 +56,12 @@ export default function LandingPage() {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     
-    if (!session && videos.length >= 2) {
+    if (!session && videos.length >= 10) {
       setShowLimitModal(true);
       return;
     }
 
-    if (session && videos.length >= 4) {
+    if (session && videos.length >= 20) {
       toast.error("You've reached the maximum limit for authenticated users.");
       return;
     }
