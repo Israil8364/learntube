@@ -70,8 +70,6 @@ export default function LandingPage() {
     setLoadingStep(0); // Booting crawler
     
     try {
-      // Small artificial delay for "Booting" feel
-      await new Promise(resolve => setTimeout(resolve, 800));
       setLoadingStep(1); // Processing result
       
       let finalTranscript = transcript;
@@ -96,7 +94,6 @@ export default function LandingPage() {
         finalSegments = transcriptData.segments || [];
         
         setLoadingStep(2); // Extracting transcripts
-        await new Promise(resolve => setTimeout(resolve, 600));
       }
 
       if (!finalTranscript) {
