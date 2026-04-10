@@ -81,20 +81,32 @@ ${transcript}`;
     const content = completion.choices[0].message.content || '';
 
     // Extract JSON if it's wrapped in markdown
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    let jsonContent = content.match(/\{[\s\S]*\}/)?.[0] || '';
+    
+    if (!jsonContent) {
       console.error('NVIDIA response content:', content);
-      throw new Error('Could not parse NVIDIA response as JSON');
+      throw new Error('Could not parse NVIDIA response as JSON - No matching object found');
     }
 
-    const analysis = JSON.parse(jsonMatch[0]);
-    return {
-      summary: analysis.summary || '',
-      keyPoints: Array.isArray(analysis.keyPoints) ? analysis.keyPoints : [],
-      topics: Array.isArray(analysis.topics) ? analysis.topics : [],
-      tasks: Array.isArray(analysis.tasks) ? analysis.tasks : [],
-      learnings: Array.isArray(analysis.learnings) ? analysis.learnings : [],
-    };
+    // Sanitize common LLM JSON errors (trailing commas, etc)
+    jsonContent = jsonContent
+      .replace(/,\s*([\]\}])/g, '$1') // Remove trailing commas
+      .trim();
+
+    try {
+      const analysis = JSON.parse(jsonContent);
+      return {
+        summary: analysis.summary || '',
+        keyPoints: Array.isArray(analysis.keyPoints) ? analysis.keyPoints : [],
+        topics: Array.isArray(analysis.topics) ? analysis.topics : [],
+        tasks: Array.isArray(analysis.tasks) ? analysis.tasks : [],
+        learnings: Array.isArray(analysis.learnings) ? analysis.learnings : [],
+      };
+    } catch (parseError) {
+      console.error('JSON Parse Error Detail:', parseError);
+      console.error('Failed JSON content:', jsonContent);
+      throw new Error(`AI generated invalid JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+    }
   } catch (error) {
     console.error('NVIDIA Analysis error:', error);
     throw error;
