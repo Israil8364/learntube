@@ -2,14 +2,7 @@ import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 
-const openrouter = createOpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  headers: {
-    'HTTP-Referer': 'https://learntube-v3.vercel.app', // Your app URL
-    'X-Title': 'LearnTube V3', // Your app name
-  },
-});
+// Using direct fetch for streaming compatibility in Edge runtime
 
 export const runtime = 'edge';
 export const maxDuration = 60;
@@ -41,8 +34,8 @@ export async function POST(req: Request) {
 
     console.log('Chat API: Received request. Messages:', messages.length);
     
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.error('Chat API: Missing OPENROUTER_API_KEY');
+    if (!process.env.NVIDIA_API_KEY) {
+      console.error('Chat API: Missing NVIDIA_API_KEY');
       return new Response('API configuration error', { status: 500 });
     }
 
@@ -68,30 +61,31 @@ CRITICAL: You must answer based ONLY on the provided transcript. If the informat
 TRANSCRIPT:
 ${transcriptContext}`;
 
-    console.log('Chat API: Initiating direct fetch to OpenRouter');
+    console.log(`Chat API: Initiating stream with NVIDIA (Mistral)`);
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://learntube-v3.vercel.app",
-        "X-Title": "LearnTube V3",
+        "Authorization": `Bearer ${process.env.NVIDIA_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "arcee-ai/trinity-mini:free",
+        "model": "mistralai/mistral-7b-instruct-v0.2",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
           ...messages
-        ]
+        ],
+        "temperature": 0.5,
+        "top_p": 1,
+        "max_tokens": 1024,
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Chat API: OpenRouter direct fetch failed:', errorText);
-      return new Response(`OpenRouter Error: ${errorText}`, { status: response.status });
+      console.error('Chat API: NVIDIA stream fetch failed:', errorText);
+      return new Response(`NVIDIA API Error: ${errorText}`, { status: response.status });
     }
 
     // Direct stream return
