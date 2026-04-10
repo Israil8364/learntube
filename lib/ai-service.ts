@@ -42,23 +42,23 @@ export async function analyzeTranscript(
     baseURL: 'https://integrate.api.nvidia.com/v1',
   });
 
-  const prompt = `You are an expert at analyzing video transcripts and extracting key information.
+  const prompt = `You are a world-class educational content analyzer. Your goal is to provide a deep, comprehensive analysis of the following video transcript.
+    
+Analyze the following transcript${videoTitle ? ` from a video titled "${videoTitle}"` : ''} and provide a HIGHLY DETAILED response:
 
-Analyze the following transcript${videoTitle ? ` from a video titled "${videoTitle}"` : ''} and provide:
-
-1. A concise summary (2-3 sentences)
-2. 5-7 key learning points (high-signal insights)
-3. 5-7 main topics covered (subject-matter tags)
-4. Concrete tasks or action items suggested by the video
-5. Key terms or concepts introduced with their explanations
+1. A comprehensive summary (4-6 detailed sentences)
+2. 7-10 deep learning points (provide significant context for each)
+3. 8-12 main topics or subject-matter tags
+4. A robust list of concrete tasks or action items suggested by the video
+5. Detailed explanations for key terms or concepts introduced
 
 Format your response exactly as JSON with the following structure:
 {
   "summary": "...",
-  "keyPoints": ["point1", "point2"],
+  "keyPoints": ["detailed point 1", "detailed point 2"],
   "topics": ["topic1", "topic2"],
   "tasks": ["task1", "task2"],
-  "learnings": [{"term": "...", "explanation": "..."}]
+  "learnings": [{"term": "...", "explanation": "detailed explanation..."}]
 }
 
 TRANSCRIPT:
@@ -75,7 +75,7 @@ ${transcript}`;
       ],
       temperature: 0.5,
       top_p: 1,
-      max_tokens: 1500, // Increased to ensure enough space for the transcript analysis
+      max_tokens: 3000, 
     });
 
     const content = completion.choices[0].message.content || '';
