@@ -1,8 +1,8 @@
 import { createClient } from './supabase/server';
 import { cookies } from 'next/headers';
 
-const LIMIT_ANONYMOUS = 10;
-const LIMIT_AUTHENTICATED = 20;
+const LIMIT_ANONYMOUS = 2;
+const LIMIT_AUTHENTICATED = 4;
 
 export async function checkRateLimit() {
   const supabase = await createClient();
@@ -16,45 +16,44 @@ export async function checkRateLimit() {
   // If no device_id and not logged in, create one
   if (!deviceId && !user) {
     deviceId = crypto.randomUUID();
-    // We set it later in the response if needed, but for now we just use the generated one
   }
 
-  if (user) {
-    // Check authenticated limit
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('usage_count')
-      .eq('id', user.id)
-      .single();
+  // Calculate 24 hours ago
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    if (error || !profile) {
-      return { allowed: true, currentCount: 0, limit: LIMIT_AUTHENTICATED, type: 'auth' };
-    }
+  if (user) {
+    // Check authenticated limit by counting real analyses
+    const { count, error } = await supabase
+      .from('analyses')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', twentyFourHoursAgo);
+
+    const currentCount = count || 0;
 
     return {
-      allowed: profile.usage_count < LIMIT_AUTHENTICATED,
-      currentCount: profile.usage_count,
+      allowed: currentCount < LIMIT_AUTHENTICATED,
+      currentCount: currentCount,
       limit: LIMIT_AUTHENTICATED,
       type: 'auth',
       userId: user.id
     };
   } else {
     // Check anonymous limit
-    if (!deviceId) return { allowed: true, currentCount: 0, limit: LIMIT_ANONYMOUS, type: 'anon' };
+    if (!deviceId) return { allowed: true, currentCount: 0, limit: LIMIT_ANONYMOUS, type: 'anon', deviceId };
 
-    const { data: usage, error } = await supabase
-      .from('anonymous_usage')
-      .select('usage_count')
+    const { count, error } = await supabase
+      .from('analyses')
+      .select('*', { count: 'exact', head: true })
       .eq('device_id', deviceId)
-      .single();
+      .is('user_id', null)
+      .gte('created_at', twentyFourHoursAgo);
 
-    if (error || !usage) {
-      return { allowed: true, currentCount: 0, limit: LIMIT_ANONYMOUS, type: 'anon', deviceId };
-    }
+    const currentCount = count || 0;
 
     return {
-      allowed: usage.usage_count < LIMIT_ANONYMOUS,
-      currentCount: usage.usage_count,
+      allowed: currentCount < LIMIT_ANONYMOUS,
+      currentCount: currentCount,
       limit: LIMIT_ANONYMOUS,
       type: 'anon',
       deviceId

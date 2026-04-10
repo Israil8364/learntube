@@ -56,13 +56,17 @@ export default function LandingPage() {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     
-    if (!session && videos.length >= 10) {
+    // Calculate how many videos were done in the last 24 hours
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const recentVideos = videos.filter(v => new Date(v.createdAt).getTime() > twentyFourHoursAgo);
+
+    if (!session && recentVideos.length >= 2) {
       setShowLimitModal(true);
       return;
     }
 
-    if (session && videos.length >= 20) {
-      toast.error("You've reached the maximum limit for authenticated users.");
+    if (session && recentVideos.length >= 4) {
+      toast.error("You've reached your daily limit of 4 analyses. Come back tomorrow!");
       return;
     }
 
