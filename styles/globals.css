@@ -123,3 +123,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .markdown-content {
+    @apply text-[15px] leading-[1.6];
+  }
+  
+  .markdown-content p {
+    @apply mb-4 last:mb-0;
+  }
+  
+  .markdown-content ul, .markdown-content ol {
+    @apply mb-4 space-y-3;
+  }
+  
+  .markdown-content li {
+    @apply ml-0;
+  }
+  
+  .markdown-content strong {
+    @apply font-bold text-foreground brightness-110;
+  }
+  
+  /* Styling timestamps automatically if possible, or via AI formatting */
+  .markdown-content .timestamp {
+    @apply text-blue-400 font-medium px-1;
+  }
+}

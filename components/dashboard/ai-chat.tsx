@@ -211,7 +211,7 @@ export function AIChat({ video, onUpdateChat }: AIChatProps) {
                       )}
                     </Button>
                   )}
-                  <div className="markdown-content prose-sm max-w-none break-words overflow-wrap-anywhere prose-p:leading-relaxed prose-p:mb-3 prose-li:my-1 prose-headings:mt-4">
+                  <div className="markdown-content max-w-none break-words overflow-wrap-anywhere">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {message.content}
                     </ReactMarkdown>
