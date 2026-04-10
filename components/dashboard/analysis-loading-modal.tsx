@@ -36,7 +36,7 @@ export function AnalysisLoadingModal({ isOpen, currentStepIndex }: AnalysisLoadi
               const isActive = index === currentStepIndex;
 
               return (
-                <div key={step.id} className="flex items-center gap-4 transition-all duration-500">
+                <div key={step.id} className="flex items-center gap-4 transition-all duration-200">
                   <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
                     <AnimatePresence mode="wait">
                       {isCompleted ? (
@@ -44,6 +44,7 @@ export function AnalysisLoadingModal({ isOpen, currentStepIndex }: AnalysisLoadi
                           key="completed"
                           initial={{ scale: 0.5, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.2 }}
                           className="flex items-center justify-center w-full h-full"
                         >
                           <Check className="w-5 h-5 text-emerald-400 stroke-[3px]" />
@@ -53,6 +54,7 @@ export function AnalysisLoadingModal({ isOpen, currentStepIndex }: AnalysisLoadi
                           key="active"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
+                          transition={{ duration: 0.2 }}
                           className="flex items-center justify-center w-full h-full"
                         >
                           <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
@@ -63,7 +65,7 @@ export function AnalysisLoadingModal({ isOpen, currentStepIndex }: AnalysisLoadi
                     </AnimatePresence>
                   </div>
                   <span
-                    className={`text-lg font-semibold transition-all duration-500 tracking-tight ${
+                    className={`text-lg font-semibold transition-all duration-200 tracking-tight ${
                       isActive ? 'text-white' : isCompleted ? 'text-zinc-500' : 'text-zinc-700'
                     }`}
                   >
@@ -79,7 +81,7 @@ export function AnalysisLoadingModal({ isOpen, currentStepIndex }: AnalysisLoadi
             {[0, 1, 2, 3].map((i) => (
               <div 
                 key={i} 
-                className={`h-1.5 rounded-full transition-all duration-700 ${
+                className={`h-1.5 rounded-full transition-all duration-300 ${
                   i <= currentStepIndex ? 'w-8 bg-blue-500' : 'w-1.5 bg-zinc-800'
                 }`} 
               />
