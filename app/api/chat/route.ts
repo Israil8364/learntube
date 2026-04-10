@@ -61,7 +61,35 @@ CRITICAL: You must answer based ONLY on the provided transcript. If the informat
 TRANSCRIPT:
 ${transcriptContext}`;
 
-    console.log(`Chat API: Initiating stream with NVIDIA (Mistral)`);
+    // NVIDIA/Mistral requires strict alternating user/assistant roles
+    const sanitizedMessages: { role: 'user' | 'assistant'; content: string }[] = [];
+    let lastRole: string | null = null;
+
+    for (const msg of messages) {
+      // Mistral usually doesn't like 'system' messages in the middle of history
+      if (msg.role === 'system') continue; 
+      
+      const currentRole = msg.role as 'user' | 'assistant';
+      
+      if (currentRole === lastRole) {
+        // If consecutive roles are the same, merge the content
+        sanitizedMessages[sanitizedMessages.length - 1].content += "\n\n" + msg.content;
+      } else {
+        sanitizedMessages.push({ role: currentRole, content: msg.content });
+        lastRole = currentRole;
+      }
+    }
+
+    // Ensure we start and end with a 'user' message for best model performance
+    while (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'user') {
+      sanitizedMessages.shift();
+    }
+    
+    if (sanitizedMessages.length === 0) {
+      return new Response('No valid user messages found', { status: 400 });
+    }
+
+    console.log(`Chat API: Initiating stream with NVIDIA (Mistral) - Sanitized count: ${sanitizedMessages.length}`);
 
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
@@ -74,7 +102,7 @@ ${transcriptContext}`;
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
-          ...messages
+          ...sanitizedMessages
         ],
         "temperature": 0.5,
         "top_p": 1,
