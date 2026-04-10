@@ -1,3 +1,5 @@
+import OpenAI from 'openai';
+
 /**
  * Extract YouTube video ID from various URL formats
  */
@@ -17,7 +19,7 @@ export function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
- * Analyze a transcript using AI analysis service (OpenRouter)
+ * Analyze a transcript using NVIDIA AI analysis service
  */
 export async function analyzeTranscript(
   transcript: string,
@@ -29,11 +31,16 @@ export async function analyzeTranscript(
   tasks: string[];
   learnings: { term: string; explanation: string }[];
 }> {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('OPENROUTER_API_KEY is not set');
+  if (!NVIDIA_API_KEY) {
+    throw new Error('NVIDIA_API_KEY is not set');
   }
+
+  const nvidia = new OpenAI({
+    apiKey: NVIDIA_API_KEY,
+    baseURL: 'https://integrate.api.nvidia.com/v1',
+  });
 
   const prompt = `You are an expert at analyzing video transcripts and extracting key information.
 
@@ -58,38 +65,26 @@ TRANSCRIPT:
 ${transcript}`;
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://learntube-v3.vercel.app",
-        "X-Title": "LearnTube V3",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        "model": "arcee-ai/trinity-mini:free",
-        "messages": [
-          {
-            "role": "user",
-            "content": prompt
-          }
-        ],
-        "response_format": { "type": "json_object" }
-      })
+    const completion = await nvidia.chat.completions.create({
+      model: "mistralai/mistral-7b-instruct-v0.2",
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.5,
+      top_p: 1,
+      max_tokens: 1500, // Increased to ensure enough space for the transcript analysis
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`OpenRouter API error: ${JSON.stringify(errorData)}`);
-    }
-
-    const result = await response.json();
-    const content = result.choices[0].message.content;
+    const content = completion.choices[0].message.content || '';
 
     // Extract JSON if it's wrapped in markdown
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('Could not parse OpenRouter response');
+      console.error('NVIDIA response content:', content);
+      throw new Error('Could not parse NVIDIA response as JSON');
     }
 
     const analysis = JSON.parse(jsonMatch[0]);
@@ -101,7 +96,7 @@ ${transcript}`;
       learnings: Array.isArray(analysis.learnings) ? analysis.learnings : [],
     };
   } catch (error) {
-    console.error('Analysis error:', error);
+    console.error('NVIDIA Analysis error:', error);
     throw error;
   }
 }
