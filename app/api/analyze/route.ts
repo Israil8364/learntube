@@ -40,7 +40,19 @@ export async function POST(request: NextRequest) {
     const { transcript, title, thumbnail, segments, url } = result.data;
     const videoTitle = title || 'Video Analysis';
 
-    // 2. Analyze using AI Service
+    // 2. Validate Transcript Length (approx 20k-25k tokens max)
+    const MAX_TRANSCRIPT_LENGTH = 100000; 
+    if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
+      return NextResponse.json(
+        { 
+          error: 'This video is too long to analyze accurately. Please try a video under 90 minutes.',
+          code: 'VIDEO_TOO_LONG' 
+        }, 
+        { status: 413 }
+      );
+    }
+
+    // 3. Analyze using AI Service
     const analysis = await analyzeTranscript(transcript, videoTitle);
 
     // 3. Prepare data for Supabase (Mapping to snake_case)
