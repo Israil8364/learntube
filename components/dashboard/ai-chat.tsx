@@ -191,10 +191,10 @@ export function AIChat({ video, onUpdateChat }: AIChatProps) {
                 className={`flex flex-col mb-4 ${message.role === 'user' ? 'items-end' : 'items-start'} min-w-0`}
               >
                 <div
-                  className={`max-w-[92%] px-5 py-3 rounded-2xl text-sm leading-relaxed break-words overflow-hidden relative group/msg ${
+                  className={`rounded-xl text-sm leading-relaxed break-words overflow-hidden relative group/msg ${
                     message.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-tr-none shadow-sm'
-                      : 'bg-card border border-border/50 text-foreground rounded-tl-none shadow-sm'
+                      ? 'bg-primary text-primary-foreground px-4 py-3 max-w-[80%] ml-auto'
+                      : 'bg-gray-50 border border-gray-100 text-gray-800 p-4 shadow-sm max-w-[90%]'
                   }`}
                 >
                   {message.role === 'assistant' && message.content && (
@@ -211,11 +211,34 @@ export function AIChat({ video, onUpdateChat }: AIChatProps) {
                       )}
                     </Button>
                   )}
-                  <div className="markdown-content max-w-none break-words overflow-wrap-anywhere">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
+                  {message.role === 'assistant' ? (
+                    <div className="prose prose-sm max-w-none prose-gray">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => (
+                            <p className="mb-3 text-sm leading-relaxed text-gray-700 last:mb-0">{children}</p>
+                          ),
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-gray-900">{children}</strong>
+                          ),
+                          ul: ({ children }) => (
+                            <ul className="flex flex-col gap-2 mt-2 mb-3 last:mb-0">{children}</ul>
+                          ),
+                          li: ({ children }) => (
+                            <li className="flex gap-2 text-sm leading-relaxed text-gray-700">
+                              <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
+                              <span>{children}</span>
+                            </li>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  )}
                 </div>
                 <span className="text-[10px] text-muted-foreground mt-1.5 px-1 font-medium tracking-wide uppercase">
                   {message.role === 'assistant' ? 'AI Assistant' : 'You'}

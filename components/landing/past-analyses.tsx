@@ -5,12 +5,28 @@ import { Video } from '@/lib/types';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { PlayCircle } from 'lucide-react';
+import { HistoryCardSkeleton } from '@/components/skeletons/history-card-skeleton';
 
 interface PastAnalysesProps {
   videos: Video[];
+  isLoading?: boolean;
 }
 
-export function PastAnalyses({ videos }: PastAnalysesProps) {
+export function PastAnalyses({ videos, isLoading }: PastAnalysesProps) {
+  // Show skeleton section during initial load — never a blank hole
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-6xl mx-auto mt-16 px-6 sm:px-8 lg:px-12">
+        <div className="flex items-center justify-between mb-10 gap-4">
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight">Past Analyses</h2>
+        </div>
+        <div className="flex flex-wrap justify-center gap-8">
+          {Array(3).fill(null).map((_, i) => <HistoryCardSkeleton key={i} />)}
+        </div>
+      </div>
+    );
+  }
+
   if (videos.length === 0) {
     return null;
   }
@@ -65,3 +81,4 @@ export function PastAnalyses({ videos }: PastAnalysesProps) {
     </div>
   );
 }
+

@@ -5,6 +5,7 @@ import { Hero } from '@/components/landing/hero';
 import { InputTabs } from '@/components/landing/input-tabs';
 import { FeatureCards } from '@/components/landing/feature-cards';
 import { PastAnalyses } from '@/components/landing/past-analyses';
+import { HistoryCardSkeleton } from '@/components/skeletons/history-card-skeleton';
 import { getStoredVideos, saveVideo, generateVideoId } from '@/lib/storage';
 import { Video } from '@/lib/types';
 import { useRouter } from 'next/navigation';
@@ -27,6 +28,7 @@ import { Header } from '@/components/layout/header';
 
 export default function LandingPage() {
   const [videos, setVideos] = useState<Video[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true); // Start true to buffer flash
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -36,20 +38,29 @@ export default function LandingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchVideos() {
+    // Check if we have ANY history at all before showing skeletons
+    const stored = getStoredVideos();
+    if (stored.length === 0) {
+      setIsLoadingHistory(false);
+      return;
+    }
+
+    const loadHistory = async () => {
       try {
         const response = await fetch('/api/analyses');
         if (response.ok) {
           const data = await response.json();
           setVideos(data);
         } else {
-          setVideos(getStoredVideos());
+          setVideos(stored);
         }
-      } catch (error) {
-        setVideos(getStoredVideos());
+      } catch (e) {
+        setVideos(stored);
+      } finally {
+        setIsLoadingHistory(false);
       }
-    }
-    fetchVideos();
+    };
+    loadHistory();
   }, []);
 
   const handleAnalyze = async (url: string | null, transcript: string | null) => {
@@ -58,7 +69,7 @@ export default function LandingPage() {
     // Fast-fail rate limit check locally before triggering loaders
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     // Calculate how many videos were done in the last 24 hours
     const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
     const recentVideos = videos.filter(v => new Date(v.createdAt).getTime() > twentyFourHoursAgo);
@@ -75,10 +86,10 @@ export default function LandingPage() {
 
     setIsLoading(true);
     setLoadingStep(0); // Booting crawler
-    
+
     try {
       setLoadingStep(1); // Processing result
-      
+
       let finalTranscript = transcript;
       let finalTitle = url ? 'Video Analysis' : 'Transcript Analysis';
       let finalThumbnail = undefined;
@@ -87,19 +98,19 @@ export default function LandingPage() {
       // 1. If URL is provided, fetch transcript via our backend
       if (url && !transcript) {
         const transcriptRes = await fetch(`/api/transcript?url=${encodeURIComponent(url)}`);
-        
+
         if (!transcriptRes.ok) {
           const errData = await transcriptRes.json();
           throw new Error(errData.error || 'Failed to fetch transcript from YouTube.');
         }
 
         const transcriptData = await transcriptRes.json();
-        
+
         finalTranscript = transcriptData.transcript;
         finalTitle = transcriptData.title || finalTitle;
         finalThumbnail = transcriptData.thumbnailUrl;
         finalSegments = transcriptData.segments || [];
-        
+
         setLoadingStep(2); // Extracting transcripts
       }
 
@@ -162,7 +173,7 @@ export default function LandingPage() {
       console.error('Analysis failed:', error);
       if (error.message === 'RATE_LIMIT') {
         setShowLimitModal(true);
-      } else if (error.message === 'VIDEO_TOO_LONG') {
+      } else if (error.message === 'VIDEO_TOO_LONG' || error.message.includes('context length') || error.message.includes('tokens')) {
         setShowLengthModal(true);
       } else {
         // Handle specific content errors with a modal for better visibility
@@ -178,8 +189,8 @@ export default function LandingPage() {
           });
         } else {
           setErrorContent({
-            title: 'Something Went Wrong',
-            message: error.message || 'We encountered an unexpected error while analyzing your video. Please try again in a moment.'
+            title: 'Video lenght is too long',
+            message: error.message || 'We encountered an issue while analyzing your video. Please try a shorter video or try again in a moment.'
           });
         }
         setShowErrorModal(true);
@@ -193,7 +204,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-background relative pt-4">
       <Header />
       <AnalysisLoadingModal isOpen={isLoading} currentStepIndex={loadingStep} />
-      
+
       <AlertDialog open={showLimitModal} onOpenChange={setShowLimitModal}>
         <AlertDialogContent className="bg-[#121417] border-white/10 text-white sm:max-w-[400px]">
           <AlertDialogHeader>
@@ -206,7 +217,7 @@ export default function LandingPage() {
             <AlertDialogCancel className="bg-white/5 border-none hover:bg-white/10 text-white hover:text-white mt-2 sm:mt-0">
               Close
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={async () => {
                 setShowLimitModal(false);
                 const supabase = createClient();
@@ -214,7 +225,7 @@ export default function LandingPage() {
                   provider: 'google',
                   options: { redirectTo: `${window.location.origin}/auth/callback` },
                 });
-              }} 
+              }}
               className="bg-primary text-white hover:bg-primary/90 border-none"
             >
               Sign Up For Free
@@ -237,7 +248,7 @@ export default function LandingPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4">
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => setShowErrorModal(false)}
               className="bg-zinc-800 text-white hover:bg-zinc-700 border-none w-full sm:w-auto"
             >
@@ -257,13 +268,13 @@ export default function LandingPage() {
             </div>
             <AlertDialogTitle className="text-xl font-semibold">Whoa, that’s a marathon!</AlertDialogTitle>
             <AlertDialogDescription className="text-zinc-400 leading-relaxed">
-              This video is a bit of a giant! To ensure our AI gives you the most accurate and high-quality insights, we currently support videos with up to ~90 minutes of dialogue. 
+              This video is a bit of a giant! To ensure our AI gives you the most accurate and high-quality insights, we currently support videos with up to ~90 minutes of dialogue.
               <br /><br />
               Try a shorter video or a highlight clip to see the magic happen!
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4">
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => setShowLengthModal(false)}
               className="bg-primary text-white hover:bg-primary/90 border-none w-full sm:w-auto"
             >
@@ -277,7 +288,7 @@ export default function LandingPage() {
         <Hero />
         <InputTabs onAnalyze={handleAnalyze} isLoading={isLoading} />
         <FeatureCards />
-        <PastAnalyses videos={videos} />
+        <PastAnalyses videos={videos} isLoading={isLoadingHistory} />
       </div>
     </main>
   );

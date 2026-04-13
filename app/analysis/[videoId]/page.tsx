@@ -13,20 +13,26 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
+import { HistoryPanelSkeleton } from '@/components/skeletons/history-panel-skeleton';
+import { MiddlePanelSkeleton } from '@/components/skeletons/middle-panel-skeleton';
+import { ChatPanelSkeleton } from '@/components/skeletons/chat-panel-skeleton';
 
 export default function AnalysisDashboard() {
   const params = useParams();
   const router = useRouter();
   const videoId = params.videoId as string;
 
-  const [video, setVideo] = useState<Video | null>(null);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [video, setVideo] = useState<Video | null>(() => getVideo(videoId));
+  const [videos, setVideos] = useState<Video[]>(() => getStoredVideos());
+  const [isLoading, setIsLoading] = useState(() => !getVideo(videoId));
 
   useEffect(() => {
     async function loadData() {
       try {
-        setIsLoading(true);
+        // If we already have the video and the full list, and it's from localStorage, 
+        // we can still refresh in the background, but don't force a skeleton.
+        const shouldShowSkeleton = !video;
+        if (shouldShowSkeleton) setIsLoading(true);
         
         // Load the list for the sidebar
         const listRes = await fetch('/api/analyses');
@@ -40,15 +46,10 @@ export default function AnalysisDashboard() {
         if (videoRes.ok) {
           const currentVideo = await videoRes.json();
           setVideo(currentVideo);
-        } else {
-          // Fallback to local
-          const localVideo = getVideo(videoId);
-          if (localVideo) {
-            setVideo(localVideo);
-          } else {
-            toast.error('Video not found');
-            router.push('/');
-          }
+        } else if (!video) {
+          // Only redirect if we don't even have a local copy
+          toast.error('Video not found');
+          router.push('/');
         }
       } catch (error) {
         console.error('Error loading analysis:', error);
@@ -139,8 +140,29 @@ export default function AnalysisDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="flex h-screen overflow-hidden bg-background">
+        {/* Skeleton Sidebar */}
+        <aside className="hidden lg:flex h-full w-72 flex-shrink-0 border-r border-border bg-muted/20 overflow-hidden">
+          <div className="flex flex-col h-full w-full">
+            <div className="p-4 border-b border-border space-y-3">
+              <HistoryPanelSkeleton />
+            </div>
+          </div>
+        </aside>
+
+        {/* Skeleton Main Content */}
+        <div className="flex-1 flex flex-col min-w-0 bg-background">
+          {/* Sticky header placeholder */}
+          <header className="h-16 border-b border-border bg-card/80 sticky top-0 z-50 px-4" />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            <MiddlePanelSkeleton />
+          </main>
+        </div>
+
+        {/* Skeleton Chat Panel */}
+        <aside className="hidden xl:flex h-full w-[400px] flex-shrink-0 border-l border-border bg-card">
+          <ChatPanelSkeleton />
+        </aside>
       </div>
     );
   }

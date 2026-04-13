@@ -60,6 +60,53 @@ function formatTimestamp(totalSeconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** Chunks the transcript into uniform word blocks for cleaner reading */
+function chunkTranscript(text: string): string[] {
+  if (!text) return [];
+  
+  // Clean up any timestamp markers that might be in the raw text
+  const cleanText = text.replace(/\[?\d{1,2}:\d{2}(?::\d{2})?\]?/g, '').trim();
+  const words = cleanText.split(/\s+/).filter(Boolean);
+  
+  const WORDS_PER_BOX = 50;
+  const chunks: string[] = [];
+  
+  for (let i = 0; i < words.length; i += WORDS_PER_BOX) {
+    chunks.push(words.slice(i, i + WORDS_PER_BOX).join(' '));
+  }
+  
+  return chunks;
+}
+
+/** If we don't have segments, split a raw transcript string by timestamp markers like [00:00] or 00:00 */
+function parseTranscriptString(transcript: string | null): TranscriptParagraph[] {
+  if (!transcript) return [];
+  
+  // Look for patterns like [00:00] or 00:00:00 or 00:00
+  const timestampRegex = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
+  const parts = transcript.split(timestampRegex);
+  const paragraphs: TranscriptParagraph[] = [];
+  
+  for (let i = 1; i < parts.length; i += 2) {
+    const timestampStr = parts[i];
+    const rawText = parts[i + 1] || '';
+    // Clean up brackets, colon or dashes at start of text
+    const text = rawText.trim().replace(/^\]\s*|^\:\s*|^\-\s*/, '').trim();
+    
+    const timeParts = timestampStr.split(':').map(Number);
+    let seconds = 0;
+    if (timeParts.length === 3) {
+      seconds = (timeParts[0] || 0) * 3600 + (timeParts[1] || 0) * 60 + (timeParts[2] || 0);
+    } else if (timeParts.length === 2) {
+      seconds = (timeParts[0] || 0) * 60 + (timeParts[1] || 0);
+    }
+    
+    paragraphs.push({ startOffset: seconds, text });
+  }
+  
+  return paragraphs;
+}
+
 
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -87,11 +134,10 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
     }, 600);
   };
 
-  // Grouped paragraphs (memoized — only recomputed when segments change)
-  const paragraphs = useMemo(
-    () => groupSegmentsIntoParagraphs(video.segments || []),
-    [video.segments]
-  );
+  // Grouped chunks for reading-focused layout (50 words each)
+  const transcriptChunks = useMemo(() => {
+    return chunkTranscript(video.transcript || '');
+  }, [video.transcript]);
 
 
   // Word count + reading time
@@ -293,35 +339,20 @@ export function AnalysisTabs({ video, onUpdateTasks }: AnalysisTabsProps) {
 
 
 
-          {/* ── Two-column transcript list ── */}
-          {paragraphs.length > 0 ? (
-            <div className="space-y-0">
-              {paragraphs.map((para, index) => (
-                <div key={index} className="flex gap-6 group/row py-4 border-b border-border/20 last:border-0">
-
-                  {/* Left: timestamp — always MM:SS, clickable */}
-                  <a
-                    href={youtubeUrl(para.startOffset)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-shrink-0 w-12 pt-0.5 font-mono text-sm font-semibold text-primary/70 hover:text-primary transition-colors leading-relaxed"
-                    title="Jump to this point in YouTube"
-                  >
-                    {formatTimestamp(para.startOffset)}
-                  </a>
-
-                  {/* Right: flowing text */}
-                  <p className="text-[15px] leading-[1.8] text-foreground/80 group-hover/row:text-foreground transition-colors flex-1">
-                    {para.text}
+          {/* ── Word-limited transcript boxes ── */}
+          {transcriptChunks.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {transcriptChunks.map((chunk, index) => (
+                <div 
+                  key={index} 
+                  className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3"
+                >
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {chunk}
                   </p>
-
                 </div>
               ))}
             </div>
-          ) : paragraphs.length === 0 && video.transcript ? (
-            <p className="text-[15px] leading-[1.8] whitespace-pre-wrap text-foreground/80">
-              {video.transcript}
-            </p>
           ) : (
             <div className="py-12 text-center text-muted-foreground">
               <Clock className="w-8 h-8 mx-auto mb-3 opacity-20" />
