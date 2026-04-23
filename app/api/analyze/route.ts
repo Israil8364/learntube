@@ -13,8 +13,7 @@ const analyzeSchema = z.object({
   segments: z.array(z.any()).nullable().optional(),
 });
 
-export const runtime = 'nodejs'; // Using nodejs for more flexibility with cookies and crypto
-export const maxDuration = 60;
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
