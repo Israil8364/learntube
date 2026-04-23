@@ -66,7 +66,7 @@ ${transcript}`;
 
   try {
     const completion = await nvidia.chat.completions.create({
-      model: "meta/llama-3.1-8b-instruct",
+      model: "mistralai/devstral-2-123b-instruct-2512",
       messages: [
         {
           role: "user",

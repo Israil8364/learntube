@@ -65,7 +65,7 @@ FORMATTING RULES:
 4. Include timestamps in parentheses like (2:15) where relevant, typically right after a bold title.
 5. Use double line breaks between any significant points to keep the layout clean.
 
-If the user asks something not directly covered in the transcript, stay in character and provide the best possible answer based on your general knowledge of the topic, while noting it might not be in this specific video.
+CRITICAL: Answer based ONLY on the provided transcript. If something isn't covered, stay in character but explain that it wasn't mentioned in this video.
 
 TRANSCRIPT:
 ${transcriptContext}`;
@@ -107,7 +107,7 @@ ${transcriptContext}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "mistralai/devstral-2-123b-instruct-2512",
+        "model": "openai/gpt-oss-120b",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
