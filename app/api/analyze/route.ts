@@ -51,69 +51,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Analyze using AI Service
-    const analysis = await analyzeTranscript(transcript, videoTitle);
+    // 6. Use a ReadableStream to keep the connection alive with pulses
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Send a space every 5 seconds to keep the connection alive
+        const interval = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(' '));
+          } catch (e) {
+            // Stream might be closed
+          }
+        }, 5000);
 
-    // 3. Prepare data for Supabase (Mapping to snake_case)
-    const supabase = await createClient();
-    const videoId = generateVideoId();
+        try {
+          // 3. Analyze using AI Service
+          const analysis = await analyzeTranscript(transcript, videoTitle);
 
-    const analysisData = {
-      id: videoId,
-      user_id: rateLimit.type === 'auth' ? rateLimit.userId : null,
-      device_id: rateLimit.type === 'anon' ? rateLimit.deviceId : null,
-      url: url || 'transcript-only',
-      title: videoTitle,
-      thumbnail: thumbnail || null,
-      transcript: transcript,
-      segments: segments || [],
-      summary: analysis.summary,
-      key_points: analysis.keyPoints,
-      topics: analysis.topics,
-      tasks: analysis.tasks,
-      learnings: analysis.learnings,
-      created_at: new Date().toISOString()
-    };
+          // 3. Prepare data for Supabase
+          const supabase = await createClient();
+          const videoId = generateVideoId();
 
-    const { error: dbError } = await supabase
-      .from('analyses')
-      .insert(analysisData);
+          const analysisData = {
+            id: videoId,
+            user_id: rateLimit.type === 'auth' ? rateLimit.userId : null,
+            device_id: rateLimit.type === 'anon' ? rateLimit.deviceId : null,
+            url: url || 'transcript-only',
+            title: videoTitle,
+            thumbnail: thumbnail || null,
+            transcript: transcript,
+            segments: segments || [],
+            summary: analysis.summary,
+            key_points: analysis.keyPoints,
+            topics: analysis.topics,
+            tasks: analysis.tasks,
+            learnings: analysis.learnings,
+            created_at: new Date().toISOString()
+          };
 
-    if (dbError) {
-      console.error('Supabase save error:', dbError);
-      // We still return the analysis even if DB save fails, but log it
-    }
+          await supabase.from('analyses').insert(analysisData);
 
-    // 4. Increment usage count
-    await incrementUsage({
-      userId: rateLimit.type === 'auth' ? rateLimit.userId : undefined,
-      deviceId: rateLimit.type === 'anon' ? rateLimit.deviceId : undefined
+          // 4. Increment usage count
+          await incrementUsage({
+            userId: rateLimit.type === 'auth' ? rateLimit.userId : undefined,
+            deviceId: rateLimit.type === 'anon' ? rateLimit.deviceId : undefined
+          });
+
+          // Final response data
+          const responseData = JSON.stringify({
+            id: videoId,
+            title: videoTitle,
+            thumbnail: thumbnail || null,
+            transcript: transcript,
+            segments: segments || null,
+            summary: analysis.summary,
+            keyPoints: analysis.keyPoints,
+            topics: analysis.topics,
+            tasks: analysis.tasks,
+            learnings: analysis.learnings,
+          });
+
+          controller.enqueue(encoder.encode(responseData));
+        } catch (err: any) {
+          console.error('Stream processing error:', err);
+          const errorMsg = JSON.stringify({ error: err.message || 'Internal server error' });
+          controller.enqueue(encoder.encode(errorMsg));
+        } finally {
+          clearInterval(interval);
+          controller.close();
+        }
+      }
     });
 
-    // 5. Build response and set cookie if new anonymous user
-    const response = NextResponse.json({
-      id: videoId,
-      title: videoTitle,
-      thumbnail: thumbnail || null,
-      transcript: transcript,
-      segments: segments || null,
-      summary: analysis.summary,
-      keyPoints: analysis.keyPoints,
-      topics: analysis.topics,
-      tasks: analysis.tasks,
-      learnings: analysis.learnings,
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
-
-    if (rateLimit.type === 'anon' && rateLimit.deviceId) {
-      response.cookies.set('device_id', rateLimit.deviceId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 365 // 1 year
-      });
-    }
-
-    return response;
   } catch (error) {
     console.error('Analyze API error:', error);
 
