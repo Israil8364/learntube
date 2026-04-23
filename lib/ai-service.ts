@@ -64,7 +64,7 @@ Format your response exactly as JSON with the following structure:
 TRANSCRIPT:
 ${transcript}`;
 
-  try {
+  try {    // Initialize NVIDIA client for analysis
     const completion = await nvidia.chat.completions.create({
       model: "mistralai/mistral-large-3-675b-instruct-2512",
       messages: [
