@@ -66,7 +66,7 @@ ${transcript}`;
 
   try {
     const completion = await nvidia.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+      model: "mistralai/devstral-2-123b-instruct-2512",
       messages: [
         {
           role: "user",

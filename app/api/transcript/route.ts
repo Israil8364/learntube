@@ -158,49 +158,33 @@ export async function GET(req: NextRequest) {
     item && typeof item === 'object' && typeof item.text === 'string';
 
   if (Array.isArray(data) && data.length > 0) {
-    if (isSegment(data[0])) {
-      // ── Shape A: top-level array of segment objects ──────────────────────
+    const first = data[0];
+
+    // Priority 1: Shape B (Video wrapper with full tracks)
+    if (first.transcripts || first.segments || first.transcript) {
+      console.log('[transcript] Detected Wrapper Shape: extracting tracks');
+      const transcripts = first.transcripts || [];
+      const bestTrack = transcripts.find((t: any) => (t.language_code || t.languageCode || '').startsWith('en')) || transcripts[0];
+      rawSegments = bestTrack?.segments || bestTrack?.transcript || bestTrack?.captions || first.segments || first.transcript || [];
+      
+      // If we still found nothing but the first object looks like a single segment itself, fall back
+      if (rawSegments.length === 0 && isSegment(first)) {
+        rawSegments = data;
+      }
+    } 
+    // Priority 2: Shape A (Flat array of segments)
+    else if (isSegment(first)) {
       console.log('[transcript] Detected Shape A: flat segments array');
       rawSegments = data;
-    } else {
-      // ── Shape B: array of video wrapper objects ──────────────────────────
-      console.log('[transcript] Detected Shape B: video wrapper array');
-      const videoObj = data[0];
-
-      if (Array.isArray(videoObj.transcripts) && videoObj.transcripts.length > 0) {
-        // Prefer English; fall back to first available track
-        const sorted = [...videoObj.transcripts].sort((a: any, b: any) => {
-          const aCode = (a.language_code || a.languageCode || '').toLowerCase();
-          const bCode = (b.language_code || b.languageCode || '').toLowerCase();
-          if (aCode.startsWith('en') && !bCode.startsWith('en')) return -1;
-          if (!aCode.startsWith('en') && bCode.startsWith('en')) return 1;
-          return 0;
-        });
-        const bestTrack = sorted[0];
-        rawSegments =
-          bestTrack?.segments ??
-          bestTrack?.transcript ??
-          bestTrack?.captions ??
-          [];
-        // Track itself might be directly {text,start,dur} segments
-        if (rawSegments.length === 0 && isSegment(bestTrack)) {
-          rawSegments = videoObj.transcripts;
-        }
-      } else if (Array.isArray(videoObj.segments)) {
-        rawSegments = videoObj.segments;
-      } else if (Array.isArray(videoObj.transcript)) {
-        rawSegments = videoObj.transcript;
-      } else if (Array.isArray(videoObj.captions)) {
-        rawSegments = videoObj.captions;
-      }
     }
-  } else if (data && typeof data === 'object') {
-    // ── Shape C: object keyed by videoId ──────────────────────────────────
-    console.log('[transcript] Detected Shape C: keyed object');
-    const inner = data[videoId] ?? Object.values(data)[0];
-    if (Array.isArray(inner)) {
-      rawSegments = isSegment(inner[0]) ? inner : inner[0]?.segments ?? [];
-    }
+  } 
+  else if (data && typeof data === 'object') {
+     console.log('[transcript] Object response keys:', Object.keys(data));
+     // Shape C: Keyed by videoId or has a data property
+     const possibleContent = data[videoId] || data.segments || data.transcript || data.data || Object.values(data)[0];
+     if (Array.isArray(possibleContent)) {
+       rawSegments = isSegment(possibleContent[0]) ? possibleContent : (possibleContent[0]?.segments || []);
+     }
   }
 
   console.log(`[transcript] Extracted ${rawSegments.length} raw segments`);

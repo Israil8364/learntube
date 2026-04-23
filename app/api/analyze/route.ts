@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const videoTitle = title || 'Video Analysis';
 
     // 2. Validate Transcript Length (approx 20k-25k tokens max)
-    const MAX_TRANSCRIPT_LENGTH = 100000;
+    const MAX_TRANSCRIPT_LENGTH = 200000;
     if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
       return NextResponse.json(
         {
