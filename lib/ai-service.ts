@@ -66,7 +66,7 @@ ${transcript}`;
 
   try {
     const completion = await nvidia.chat.completions.create({
-      model: "mistralai/mistral-7b-instruct-v0.2",
+      model: "openai/gpt-oss-120b",
       messages: [
         {
           role: "user",
@@ -75,14 +75,14 @@ ${transcript}`;
       ],
       temperature: 0.5,
       top_p: 1,
-      max_tokens: 3000, 
+      max_tokens: 3000,
     });
 
     const content = completion.choices[0].message.content || '';
 
     // Extract JSON if it's wrapped in markdown
     let jsonContent = content.match(/\{[\s\S]*\}/)?.[0] || '';
-    
+
     if (!jsonContent) {
       console.error('NVIDIA response content:', content);
       throw new Error('Could not parse NVIDIA response as JSON - No matching object found');

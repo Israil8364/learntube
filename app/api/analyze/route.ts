@@ -22,10 +22,10 @@ export async function POST(request: NextRequest) {
     const rateLimit = await checkRateLimit();
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { 
+        {
           error: `Usage limit reached (${rateLimit.currentCount}/${rateLimit.limit}). Please sign up to increase your limit.`,
-          code: 'RATE_LIMIT_EXCEEDED' 
-        }, 
+          code: 'RATE_LIMIT_EXCEEDED'
+        },
         { status: 429 }
       );
     }
@@ -41,13 +41,13 @@ export async function POST(request: NextRequest) {
     const videoTitle = title || 'Video Analysis';
 
     // 2. Validate Transcript Length (approx 20k-25k tokens max)
-    const MAX_TRANSCRIPT_LENGTH = 100000; 
+    const MAX_TRANSCRIPT_LENGTH = 100000;
     if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
       return NextResponse.json(
-        { 
+        {
           error: 'This video is too long to analyze accurately. Please try a video under 90 minutes.',
-          code: 'VIDEO_TOO_LONG' 
-        }, 
+          code: 'VIDEO_TOO_LONG'
+        },
         { status: 413 }
       );
     }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     // 3. Prepare data for Supabase (Mapping to snake_case)
     const supabase = await createClient();
     const videoId = generateVideoId();
-    
+
     const analysisData = {
       id: videoId,
       user_id: rateLimit.type === 'auth' ? rateLimit.userId : null,
@@ -119,12 +119,6 @@ export async function POST(request: NextRequest) {
     console.error('Analyze API error:', error);
 
     if (error instanceof Error) {
-      if (error.message.includes('OPENROUTER_API_KEY')) {
-        return NextResponse.json(
-          { error: 'API configuration error. Please check environment variables.' },
-          { status: 500 }
-        );
-      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

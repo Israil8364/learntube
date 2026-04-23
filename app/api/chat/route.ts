@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     }
 
     console.log('Chat API: Received request. Messages:', messages.length);
-    
+
     if (!process.env.NVIDIA_API_KEY) {
       console.error('Chat API: Missing NVIDIA_API_KEY');
       return new Response('API configuration error', { status: 500 });
@@ -76,10 +76,10 @@ ${transcriptContext}`;
 
     for (const msg of messages) {
       // Mistral usually doesn't like 'system' messages in the middle of history
-      if (msg.role === 'system') continue; 
-      
+      if (msg.role === 'system') continue;
+
       const currentRole = msg.role as 'user' | 'assistant';
-      
+
       if (currentRole === lastRole) {
         // If consecutive roles are the same, merge the content
         sanitizedMessages[sanitizedMessages.length - 1].content += "\n\n" + msg.content;
@@ -93,7 +93,7 @@ ${transcriptContext}`;
     while (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'user') {
       sanitizedMessages.shift();
     }
-    
+
     if (sanitizedMessages.length === 0) {
       return new Response('No valid user messages found', { status: 400 });
     }
@@ -107,7 +107,7 @@ ${transcriptContext}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "mistralai/mistral-7b-instruct-v0.2",
+        "model": "nvidia/nemotron-3-content-safety",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },
