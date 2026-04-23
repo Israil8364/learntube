@@ -107,7 +107,7 @@ ${transcriptContext}`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "openai/gpt-oss-120b",
+        "model": "qwen/qwen3-coder-480b-a35b-instruct",
         "stream": true,
         "messages": [
           { "role": "system", "content": systemPrompt },

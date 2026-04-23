@@ -66,7 +66,7 @@ ${transcript}`;
 
   try {    // Initialize NVIDIA client for analysis
     const completion = await nvidia.chat.completions.create({
-      model: "mistralai/mistral-large-3-675b-instruct-2512",
+      model: "qwen/qwen3-coder-480b-a35b-instruct",
       messages: [
         {
           role: "user",
